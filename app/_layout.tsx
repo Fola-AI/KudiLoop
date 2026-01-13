@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, ActivityIndicator, Pressable, LogBox } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, LogBox, InteractionManager, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { UIReadyProvider } from '@/contexts/UIReadyContext';
 import { queryClient, asyncStoragePersister, PersistQueryClientProvider } from '@/services/queryClient';
 import { tokenCache } from '@/services/tokenCache';
 import { colors } from '@/theme';
@@ -14,13 +15,26 @@ import api from '@/services/api';
 import { env } from '@/config/env';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { AnimatedSplash } from '@/components/AnimatedSplash';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { setAppReady as openAlertGate } from '@/utils/alertGate';
 import '../global.css';
 
-// Suppress specific React Native warnings that don't affect functionality
+// Suppress ALL LogBox errors and warnings - no error dialogs should show to users
+// This prevents the red error screen from appearing for non-fatal errors
+LogBox.ignoreAllLogs(true);
+
+// Additionally ignore specific patterns (belt and suspenders approach)
 LogBox.ignoreLogs([
-  'Text strings must be rendered within a <Text> component',
-  'VirtualizedLists should never be nested',
-  // Add other noisy but non-critical warnings here if needed
+  'Network Error',
+  'Network request failed',
+  'Unable to connect',
+  'timeout',
+  'ECONNREFUSED',
+  'ERR_NETWORK',
+  '❌',
+  '⚠️',
+  'Warning:',
+  'Non-serializable values were found',
 ]);
 
 // Prevent auto-hide of native splash
@@ -83,6 +97,9 @@ export default function RootLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
   const [appReady, setAppReady] = useState(false);
+  // Wait for UI to be fully mounted before initializing Clerk
+  // This prevents "no presenter" crashes on iOS when alerts try to show too early
+  const [uiReady, setUiReady] = useState(false);
 
   const fetchClerkConfig = async () => {
     try {
@@ -144,14 +161,56 @@ export default function RootLayout() {
       } catch (e) {
         if (__DEV__) console.warn(e);
       } finally {
-        // Hide native splash screen and mark app as ready
+        // Mark app as ready first
         setAppReady(true);
-        await ExpoSplashScreen.hideAsync();
+        // Hide native splash screen safely after interactions complete
+        InteractionManager.runAfterInteractions(() => {
+          setTimeout(() => {
+            ExpoSplashScreen.hideAsync();
+          }, 100);
+        });
       }
     }
 
     prepare();
   }, []);
+
+  // Wait for UI to be fully ready before initializing Clerk
+  // This is critical on iOS to prevent native crashes when the root view controller
+  // isn't ready to present alert dialogs (permission requests, etc.)
+  useEffect(() => {
+    if (!appReady) return;
+
+    // On iOS, we need extra delay to ensure the root view controller is fully ready
+    // The "COSMCtrl applyPolicyDelta" crash happens when alerts show before presenter is ready
+    const delay = Platform.OS === 'ios' ? 500 : 100;
+    
+    const timer = setTimeout(() => {
+      InteractionManager.runAfterInteractions(() => {
+        setUiReady(true);
+        if (__DEV__) console.log('✅ UI ready for ClerkProvider initialization');
+      });
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [appReady]);
+
+  // Open the alert gate after app is fully ready
+  // This prevents iOS crashes from early Alert.alert() calls
+  useEffect(() => {
+    if (!appReady) return;
+
+    // Wait 3 seconds on iOS before allowing any alerts
+    // This gives the root view controller plenty of time to be ready
+    const alertDelay = Platform.OS === 'ios' ? 3000 : 500;
+    
+    const alertTimer = setTimeout(() => {
+      openAlertGate();
+      if (__DEV__) console.log('✅ Alert gate opened - app ready for alerts');
+    }, alertDelay);
+
+    return () => clearTimeout(alertTimer);
+  }, [appReady]);
 
   // Show nothing until app is ready (native splash still visible)
   if (!appReady) {
@@ -163,6 +222,17 @@ export default function RootLayout() {
     return (
       <SafeAreaProvider>
         <AnimatedSplash onFinish={() => setShowAnimatedSplash(false)} />
+        <StatusBar style="light" />
+      </SafeAreaProvider>
+    );
+  }
+
+  // Wait for UI to be fully ready before initializing Clerk
+  // This prevents iOS crash: "no presenter that can handle this alert item"
+  if (!uiReady) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: colors.background }} />
         <StatusBar style="light" />
       </SafeAreaProvider>
     );
@@ -190,32 +260,36 @@ export default function RootLayout() {
   }
 
   return (
-    <ClerkProvider publishableKey={clerkKey} tokenCache={tokenCache}>
-      <ClerkLoaded>
-        <PersistQueryClientProvider 
-          client={queryClient}
-          persistOptions={{ 
-            persister: asyncStoragePersister,
-            maxAge: 1000 * 60 * 60 * 24, // 24 hours
-          }}
-        >
-          <AuthProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <SafeAreaProvider>
-                <OfflineBanner />
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: colors.background },
-                    animation: 'slide_from_right',
-                  }}
-                />
-                <StatusBar style="light" />
-              </SafeAreaProvider>
-            </GestureHandlerRootView>
-          </AuthProvider>
-        </PersistQueryClientProvider>
-      </ClerkLoaded>
-    </ClerkProvider>
+    <ErrorBoundary>
+      <UIReadyProvider minimumDelay={2000}>
+        <ClerkProvider publishableKey={clerkKey} tokenCache={tokenCache}>
+          <ClerkLoaded>
+            <PersistQueryClientProvider 
+              client={queryClient}
+              persistOptions={{ 
+                persister: asyncStoragePersister,
+                maxAge: 1000 * 60 * 60 * 24, // 24 hours
+              }}
+            >
+              <AuthProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <SafeAreaProvider>
+                    <OfflineBanner />
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: colors.background },
+                        animation: 'slide_from_right',
+                      }}
+                    />
+                    <StatusBar style="light" />
+                  </SafeAreaProvider>
+                </GestureHandlerRootView>
+              </AuthProvider>
+            </PersistQueryClientProvider>
+          </ClerkLoaded>
+        </ClerkProvider>
+      </UIReadyProvider>
+    </ErrorBoundary>
   );
 }

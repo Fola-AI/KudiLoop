@@ -28,12 +28,13 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>kudiloop</string>
-          <string>com.kudiloop.app</string>
         </array>
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>8</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSRequiresIPhoneOS</key>
@@ -46,19 +47,23 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Take photos of payment receipts</string>
+    <string>KudiLoop needs access to your camera to take photos of payment receipts.</string>
     <key>NSFaceIDUsageDescription</key>
-    <string>Use Face ID to securely access your account</string>
+    <string>KudiLoop uses Face ID for secure authentication.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your photos</string>
+    <string>KudiLoop needs access to your photos to upload payment receipts.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
     </array>
     <key>RCTNewArchEnabled</key>
     <true/>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>remote-notification</string>
+    </array>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>

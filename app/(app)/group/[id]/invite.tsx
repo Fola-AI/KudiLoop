@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, Alert, Share, TextInput, Modal, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, Share, TextInput, Modal, ActivityIndicator } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -422,7 +423,7 @@ export default function InviteScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       refetch();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to create invite");
+      safeAlert("Error", error.message || "Failed to create invite");
     }
   };
   
@@ -445,11 +446,11 @@ export default function InviteScreen() {
     const inviteUrl = `${BASE_URL}/invite/${token}`;
     await Clipboard.setStringAsync(inviteUrl);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert("Copied!", "Invite link copied to clipboard");
+    safeAlert("Copied!", "Invite link copied to clipboard");
   };
   
   const handleRevoke = (inviteId: string) => {
-    Alert.alert(
+    safeAlert(
       "Revoke Invite",
       "Are you sure you want to revoke this invite link? It will no longer work.",
       [
@@ -462,7 +463,7 @@ export default function InviteScreen() {
               await deleteInvite.mutateAsync(inviteId);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (error: any) {
-              Alert.alert("Error", error.message || "Failed to revoke invite");
+              safeAlert("Error", error.message || "Failed to revoke invite");
             }
           },
         },
@@ -606,7 +607,7 @@ export default function InviteScreen() {
         onCopy={async () => {
           await Clipboard.setStringAsync(selectedInviteUrl);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Copied!', 'Invite link copied to clipboard');
+          safeAlert('Copied!', 'Invite link copied to clipboard');
         }}
       />
     </>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, InteractionManager } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import { useUIReady } from '@/contexts/UIReadyContext';
 
 // Check if running in Expo Go BEFORE importing notifications
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -12,22 +13,48 @@ export function usePushNotifications() {
   const notificationListener = useRef<any>();
   const responseListener = useRef<any>();
   const router = useRouter();
+  const isMountedRef = useRef(true);
+  const hasRequestedRef = useRef(false);
+  
+  // Use the UIReady context for safe permission requests
+  const { isUIReady, safelyRequestPermission } = useUIReady();
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     // Skip ALL notification setup in Expo Go
     if (isExpoGo) {
-      console.log('📱 Push notifications skipped - not supported in Expo Go');
-      console.log('ℹ️  Create a development build to test push notifications');
+      if (__DEV__) {
+        console.log('📱 Push notifications skipped - not supported in Expo Go');
+        console.log('ℹ️  Create a development build to test push notifications');
+      }
       return;
     }
 
-    // Only import and use notifications in non-Expo Go environments
-    setupPushNotifications();
-
     return () => {
+      isMountedRef.current = false;
       cleanupNotifications();
     };
   }, []);
+
+  // Only request permissions when UI is ready and we haven't requested yet
+  useEffect(() => {
+    if (isExpoGo || !isUIReady || hasRequestedRef.current) return;
+    
+    hasRequestedRef.current = true;
+    
+    // Additional delay after UI is ready for extra safety on iOS
+    const timer = setTimeout(() => {
+      if (isMountedRef.current) {
+        safelyRequestPermission(async () => {
+          await setupPushNotifications();
+          return true;
+        });
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [isUIReady, safelyRequestPermission]);
 
   const setupPushNotifications = async () => {
     try {
@@ -46,7 +73,9 @@ export function usePushNotifications() {
 
       // Must be a physical device
       if (!Device.default.isDevice) {
-        console.log('Push notifications require a physical device');
+        if (__DEV__) {
+          console.log('Push notifications require a physical device');
+        }
         return;
       }
 
@@ -60,7 +89,9 @@ export function usePushNotifications() {
       }
 
       if (finalStatus !== 'granted') {
-        console.log('Push notification permission not granted');
+        if (__DEV__) {
+          console.log('Push notification permission not granted');
+        }
         return;
       }
 
@@ -68,7 +99,9 @@ export function usePushNotifications() {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
       
       if (!projectId) {
-        console.log('ℹ️  No EAS projectId - push notifications will work after EAS setup');
+        if (__DEV__) {
+          console.log('ℹ️  No EAS projectId - push notifications will work after EAS setup');
+        }
         return;
       }
 
@@ -76,8 +109,12 @@ export function usePushNotifications() {
         projectId,
       });
       
-      setExpoPushToken(tokenData.data);
-      console.log('✅ Push token obtained:', tokenData.data);
+      if (isMountedRef.current) {
+        setExpoPushToken(tokenData.data);
+      }
+      if (__DEV__) {
+        console.log('✅ Push token obtained:', tokenData.data);
+      }
 
       // Register with backend
       await registerTokenWithBackend(tokenData.data);
@@ -85,7 +122,9 @@ export function usePushNotifications() {
       // Set up listeners
       notificationListener.current = Notifications.addNotificationReceivedListener(
         (notification) => {
-          console.log('Notification received:', notification);
+          if (__DEV__) {
+            console.log('Notification received:', notification);
+          }
         }
       );
 
@@ -98,7 +137,9 @@ export function usePushNotifications() {
 
     } catch (err: any) {
       // Silently handle errors in development
-      console.log('Push notification setup skipped:', err.message);
+      if (__DEV__) {
+        console.log('Push notification setup skipped:', err.message);
+      }
     }
   };
 
@@ -137,9 +178,13 @@ export function usePushNotifications() {
         platform: Platform.OS,
         deviceName: Device.default.deviceName || `${Platform.OS} device`,
       });
-      console.log('✅ Push token registered with backend');
+      if (__DEV__) {
+        console.log('✅ Push token registered with backend');
+      }
     } catch (err) {
-      console.log('Failed to register push token with backend');
+      if (__DEV__) {
+        console.log('Failed to register push token with backend');
+      }
     }
   };
 
@@ -147,7 +192,9 @@ export function usePushNotifications() {
   const deregisterToken = async () => {
     // Skip in Expo Go or if no token
     if (isExpoGo || !expoPushToken) {
-      console.log('📱 Push token deregistration skipped (Expo Go or no token)');
+      if (__DEV__) {
+        console.log('📱 Push token deregistration skipped (Expo Go or no token)');
+      }
       return;
     }
     
@@ -155,11 +202,15 @@ export function usePushNotifications() {
       const { default: api } = await import('@/services/api');
       // Token is URL encoded in the path parameter
       await api.delete(`/device-tokens/${encodeURIComponent(expoPushToken)}`);
-      console.log('✅ Push token deregistered from backend');
+      if (__DEV__) {
+        console.log('✅ Push token deregistered from backend');
+      }
       setExpoPushToken(null);
     } catch (err) {
       // Don't block sign out if deregistration fails
-      console.log('Failed to deregister push token (non-blocking)');
+      if (__DEV__) {
+        console.log('Failed to deregister push token (non-blocking)');
+      }
     }
   };
 

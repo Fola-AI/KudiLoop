@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, TextInput, Alert, Modal, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, TextInput, Modal, ActivityIndicator } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -121,7 +122,7 @@ function CreatePotModal({
   
   const handleCreate = () => {
     if (!name.trim()) {
-      Alert.alert("Error", "Please enter a pot name");
+      safeAlert("Error", "Please enter a pot name");
       return;
     }
     onCreate(name);
@@ -215,11 +216,11 @@ function TransferModal({
   const handleTransfer = () => {
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
-      Alert.alert("Error", "Please enter a valid amount");
+      safeAlert("Error", "Please enter a valid amount");
       return;
     }
     if (numAmount > maxAmount) {
-      Alert.alert("Error", `Insufficient ${type === "deposit" ? "wallet" : "pot"} balance`);
+      safeAlert("Error", `Insufficient ${type === "deposit" ? "wallet" : "pot"} balance`);
       return;
     }
     
@@ -378,14 +379,14 @@ export default function SavingsPotsScreen() {
       await createPot.mutateAsync(name);
       setShowCreateModal(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Success", `"${name}" pot created!`);
+      safeAlert("Success", `"${name}" pot created!`);
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to create pot");
+      safeAlert("Error", error.message || "Failed to create pot");
     }
   };
   
   const handleDeletePot = (pot: SavingsPot) => {
-    Alert.alert(
+    safeAlert(
       "Delete Pot",
       `Are you sure you want to delete "${pot.name}"?`,
       [
@@ -398,7 +399,7 @@ export default function SavingsPotsScreen() {
               await deletePot.mutateAsync(pot.id);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (error: any) {
-              Alert.alert("Error", error.message || "Failed to delete pot");
+              safeAlert("Error", error.message || "Failed to delete pot");
             }
           },
         },
@@ -419,9 +420,9 @@ export default function SavingsPotsScreen() {
       
       setTransferPot(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Success", `${type === "deposit" ? "Deposited" : "Withdrew"} ${formatCurrency(amount, currency as CurrencyCode)}`);
+      safeAlert("Success", `${type === "deposit" ? "Deposited" : "Withdrew"} ${formatCurrency(amount, currency as CurrencyCode)}`);
     } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || error.message || "Transfer failed");
+      safeAlert("Error", error.response?.data?.error || error.message || "Transfer failed");
     }
   };
   

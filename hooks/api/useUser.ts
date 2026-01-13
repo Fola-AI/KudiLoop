@@ -95,5 +95,30 @@ export function useUploadProfilePhoto() {
   });
 }
 
+// Delete user account (Apple App Store requirement)
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async () => {
+      if (__DEV__) {
+        console.log('🗑️ Deleting user account...');
+      }
+      
+      const { data } = await api.delete('/account');
+      
+      if (__DEV__) {
+        console.log('🗑️ Account deletion response:', data);
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      // Clear all cached data
+      queryClient.clear();
+    },
+  });
+}
+
 // Helper to check if running in dev mode
 declare const __DEV__: boolean;

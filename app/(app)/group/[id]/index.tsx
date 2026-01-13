@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -446,7 +447,7 @@ export default function GroupDetailScreen() {
   // Handle View Receipt
   const handleViewReceipt = useCallback((receiptUrl: string | null, memberName: string) => {
     if (!receiptUrl) {
-      Alert.alert('No Receipt', 'This member has not uploaded a receipt yet.');
+      safeAlert('No Receipt', 'This member has not uploaded a receipt yet.');
       return;
     }
     setSelectedReceiptUrl(receiptUrl);
@@ -473,10 +474,10 @@ export default function GroupDetailScreen() {
     try {
       await approveContribution.mutateAsync(contribution.id);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Approved', `${memberName}'s payment has been approved.`);
+      safeAlert('Approved', `${memberName}'s payment has been approved.`);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to approve payment');
+      safeAlert('Error', error.response?.data?.message || error.message || 'Failed to approve payment');
     } finally {
       setProcessingId(null);
     }
@@ -488,7 +489,7 @@ export default function GroupDetailScreen() {
       `${contribution.member?.user?.firstName || ''} ${contribution.member?.user?.lastName || ''}`.trim() || 
       'Member';
     
-    Alert.alert(
+    safeAlert(
       'Decline Payment',
       `This will reject ${memberName}'s payment and delete any uploaded receipt. They will need to resubmit.`,
       [
@@ -503,10 +504,10 @@ export default function GroupDetailScreen() {
             try {
               await declineContribution.mutateAsync(contribution.id);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              Alert.alert('Declined', 'Payment has been declined. Member can resubmit.');
+              safeAlert('Declined', 'Payment has been declined. Member can resubmit.');
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to decline payment');
+              safeAlert('Error', error.response?.data?.message || error.message || 'Failed to decline payment');
             } finally {
               setProcessingId(null);
             }
@@ -524,7 +525,7 @@ export default function GroupDetailScreen() {
     
     const cycleNumber = group?.currentCycle || 1;
     
-    Alert.alert(
+    safeAlert(
       'Confirm Payment',
       `Mark ${memberName}'s payment as paid for Cycle ${cycleNumber}?\n\nUse this for cash payments or bank transfers verified outside the app.`,
       [
@@ -553,16 +554,16 @@ export default function GroupDetailScreen() {
               } else {
                 // No contribution record - this case needs the API to handle creation
                 // For now, show a message. The backend PATCH endpoint handles this
-                Alert.alert('Note', 'No pending contribution record found. The member may need to submit a payment first, or try refreshing the page.');
+                safeAlert('Note', 'No pending contribution record found. The member may need to submit a payment first, or try refreshing the page.');
                 setProcessingId(null);
                 return;
               }
               
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert('Payment Recorded', `${memberName}'s payment has been marked as paid.`);
+              safeAlert('Payment Recorded', `${memberName}'s payment has been marked as paid.`);
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to mark payment as paid');
+              safeAlert('Error', error.response?.data?.message || error.message || 'Failed to mark payment as paid');
             } finally {
               setProcessingId(null);
             }
@@ -985,7 +986,7 @@ export default function GroupDetailScreen() {
                   if (canSeeSchedule) {
                     router.push(`/group/${id}/schedule` as any);
                   } else {
-                    Alert.alert('Schedule Hidden', 'The schedule has been hidden by the group admin.');
+                    safeAlert('Schedule Hidden', 'The schedule has been hidden by the group admin.');
                   }
                 }}
                 style={({ pressed }) => ({

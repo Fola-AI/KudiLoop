@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -64,7 +65,7 @@ export default function AddMemberScreen() {
       queryClient.invalidateQueries({ queryKey: ['groups', id, 'members'] });
       await Promise.all([refetchGroup(), refetchMembers()]);
       
-      Alert.alert(
+      safeAlert(
         'Member Added!',
         `${fullName.trim()} has been added to the group. They will receive an email invitation to join.`,
         [
@@ -78,7 +79,7 @@ export default function AddMemberScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       const message = error.response?.data?.message || error.response?.data?.error || 'Failed to add member. Please try again.';
-      Alert.alert('Error', message);
+      safeAlert('Error', message);
     } finally {
       setIsSubmitting(false);
     }

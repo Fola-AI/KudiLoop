@@ -1,14 +1,18 @@
-import { View, Text, ScrollView, Pressable, Switch, Alert, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, Switch, ActivityIndicator, Modal, Animated } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, Avatar } from "@/components/ui";
 import { colors } from "@/theme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGroups } from "@/hooks/api";
+import { useGroups, useUserSettings, useUpdateSettings, useDeleteAccount } from "@/hooks/api";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { getTimeoutOptions } from "@/hooks/useSessionTimeout";
+import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Settings Item Component
 function SettingsItem({
@@ -136,14 +140,207 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+// Bottom Sheet Picker for Timeout Selection
+function TimeoutPickerSheet({
+  visible,
+  currentValue,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  currentValue: number;
+  onSelect: (value: number) => void;
+  onClose: () => void;
+}) {
+  const slideAnim = useRef(new Animated.Value(300)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const options = getTimeoutOptions();
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          damping: 20,
+          stiffness: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 300,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <Pressable 
+        style={{ flex: 1 }}
+        onPress={onClose}
+      >
+        <Animated.View 
+          style={{ 
+            flex: 1, 
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'flex-end',
+            opacity: fadeAnim,
+          }}
+        >
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <Animated.View 
+              style={{ 
+                backgroundColor: colors.card,
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+                paddingTop: 8,
+                paddingBottom: 34,
+                transform: [{ translateY: slideAnim }],
+              }}
+            >
+              {/* Handle bar */}
+              <View style={{ 
+                alignItems: 'center', 
+                paddingVertical: 12,
+              }}>
+                <View style={{ 
+                  width: 40, 
+                  height: 4, 
+                  backgroundColor: '#4b5563', 
+                  borderRadius: 2,
+                }} />
+              </View>
+
+              {/* Title */}
+              <Text style={{ 
+                color: 'white', 
+                fontSize: 18, 
+                fontWeight: '600',
+                textAlign: 'center',
+                paddingBottom: 16,
+              }}>
+                Auto-lock Timeout
+              </Text>
+
+              {/* Description */}
+              <Text style={{ 
+                color: '#9ca3af', 
+                fontSize: 14, 
+                textAlign: 'center',
+                paddingHorizontal: 24,
+                paddingBottom: 20,
+              }}>
+                Your app will lock after this period of inactivity
+              </Text>
+
+              {/* Options */}
+              {options.map((option, index) => (
+                <Pressable
+                  key={option.value}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onSelect(option.value);
+                  }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 16,
+                    paddingHorizontal: 24,
+                    backgroundColor: pressed ? 'rgba(255,255,255,0.05)' : 'transparent',
+                    borderTopWidth: index === 0 ? 1 : 0,
+                    borderBottomWidth: 1,
+                    borderColor: '#1f2937',
+                  })}
+                >
+                  <Text style={{ 
+                    color: currentValue === option.value ? colors.primary.DEFAULT : 'white', 
+                    fontSize: 16,
+                    fontWeight: currentValue === option.value ? '600' : '400',
+                  }}>
+                    {option.label}
+                  </Text>
+                  
+                  {currentValue === option.value && (
+                    <Ionicons 
+                      name="checkmark-circle" 
+                      size={24} 
+                      color={colors.primary.DEFAULT} 
+                    />
+                  )}
+                </Pressable>
+              ))}
+
+              {/* Cancel button */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onClose();
+                }}
+                style={({ pressed }) => ({
+                  marginTop: 16,
+                  marginHorizontal: 24,
+                  paddingVertical: 14,
+                  borderRadius: 12,
+                  backgroundColor: pressed ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
+                  alignItems: 'center',
+                })}
+              >
+                <Text style={{ color: '#9ca3af', fontSize: 16, fontWeight: '500' }}>
+                  Cancel
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </Pressable>
+        </Animated.View>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function ProfileScreen() {
   const { user, clerkUser, signOut } = useAuth();
   const { data: groups } = useGroups();
+  const { data: userSettings } = useUserSettings();
+  const updateSettings = useUpdateSettings();
+  const deleteAccountMutation = useDeleteAccount();
   const { deregisterToken } = usePushNotifications();
   const [biometricEnabled, setBiometricEnabled] = useState(true);
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showTimeoutPicker, setShowTimeoutPicker] = useState(false);
+  
+  // Sync local state with server settings
+  useEffect(() => {
+    if (userSettings) {
+      setBiometricEnabled(userSettings.biometricEnabled === 1);
+      setPushEnabled(userSettings.pushNotificationsEnabled === 1);
+      setEmailEnabled(userSettings.emailNotificationsEnabled === 1);
+    }
+  }, [userSettings]);
   
   // Debug: Log user data on profile page
   if (__DEV__) {
@@ -159,8 +356,63 @@ export default function ProfileScreen() {
   const fullName = `${firstName} ${lastName}`.trim();
   const groupCount = groups?.length || 0;
   
+  // Get current timeout value (default to 5 minutes)
+  const currentTimeoutMinutes = userSettings?.inactivityTimeoutMinutes || 5;
+  const timeoutLabel = currentTimeoutMinutes === 1 ? '1 minute' : `${currentTimeoutMinutes} minutes`;
+  
+  const handleTimeoutSelect = async (minutes: number) => {
+    setShowTimeoutPicker(false);
+    
+    try {
+      await updateSettings.mutateAsync({
+        inactivityTimeoutMinutes: minutes,
+        inactivityTimeoutEnabled: true,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      if (__DEV__) console.error('Failed to update timeout setting:', error);
+      safeAlert('Error', 'Failed to update auto-lock timeout. Please try again.');
+    }
+  };
+  
+  const handleBiometricToggle = async (enabled: boolean) => {
+    setBiometricEnabled(enabled);
+    try {
+      await updateSettings.mutateAsync({
+        biometricEnabled: enabled,
+      });
+    } catch (error) {
+      setBiometricEnabled(!enabled); // Revert on error
+      if (__DEV__) console.error('Failed to update biometric setting:', error);
+    }
+  };
+  
+  const handlePushToggle = async (enabled: boolean) => {
+    setPushEnabled(enabled);
+    try {
+      await updateSettings.mutateAsync({
+        pushNotificationsEnabled: enabled,
+      });
+    } catch (error) {
+      setPushEnabled(!enabled); // Revert on error
+      if (__DEV__) console.error('Failed to update push notification setting:', error);
+    }
+  };
+  
+  const handleEmailToggle = async (enabled: boolean) => {
+    setEmailEnabled(enabled);
+    try {
+      await updateSettings.mutateAsync({
+        emailNotificationsEnabled: enabled,
+      });
+    } catch (error) {
+      setEmailEnabled(!enabled); // Revert on error
+      if (__DEV__) console.error('Failed to update email notification setting:', error);
+    }
+  };
+  
   const handleSignOut = () => {
-    Alert.alert(
+    safeAlert(
       "Sign Out",
       "Are you sure you want to sign out?",
       [
@@ -178,7 +430,7 @@ export default function ProfileScreen() {
               // The AuthContext will handle redirect via the layout
             } catch (error) {
               if (__DEV__) console.error('Sign out error:', error);
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
+              safeAlert('Error', 'Failed to sign out. Please try again.');
             } finally {
               setIsSigningOut(false);
             }
@@ -186,6 +438,94 @@ export default function ProfileScreen() {
         },
       ]
     );
+  };
+
+  const handleDeleteAccount = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    
+    safeAlert(
+      "Delete Account",
+      "Are you sure you want to permanently delete your account?\n\nThis will delete:\n• Your profile and personal data\n• All your group memberships\n• Your contribution history\n• Your savings pots\n\nThis action cannot be undone.",
+      [
+        { 
+          text: "Cancel", 
+          style: "cancel" 
+        },
+        { 
+          text: "Delete My Account", 
+          style: "destructive",
+          onPress: () => confirmDeleteAccount(),
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteAccount = () => {
+    // Second confirmation for extra safety
+    safeAlert(
+      "Final Confirmation",
+      "This will permanently delete your account and all associated data. Are you absolutely sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Yes, Delete Everything", 
+          style: "destructive",
+          onPress: () => performAccountDeletion(),
+        },
+      ]
+    );
+  };
+
+  const performAccountDeletion = async () => {
+    setIsDeleting(true);
+    
+    try {
+      // 1. Call backend to delete account
+      await deleteAccountMutation.mutateAsync();
+      
+      // 2. Clear local secure storage
+      try {
+        await SecureStore.deleteItemAsync("pin_hash");
+        await SecureStore.deleteItemAsync("pin_salt");
+        await SecureStore.deleteItemAsync("biometric_enabled");
+        await SecureStore.deleteItemAsync("clerk_token");
+      } catch (storageError) {
+        if (__DEV__) console.log('Error clearing secure storage:', storageError);
+      }
+      
+      // 3. Clear AsyncStorage cached data
+      try {
+        await AsyncStorage.clear();
+      } catch (asyncError) {
+        if (__DEV__) console.log('Error clearing async storage:', asyncError);
+      }
+      
+      // 4. Sign out from Clerk
+      await signOut();
+      
+      // 5. Show success and redirect
+      safeAlert(
+        "Account Deleted",
+        "Your account has been permanently deleted.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.replace("/(auth)/welcome"),
+          }
+        ]
+      );
+      
+    } catch (error) {
+      if (__DEV__) console.error("Delete account error:", error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      safeAlert(
+        "Error",
+        "Failed to delete your account. Please try again or contact support at support@kudiloop.com",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
   
   return (
@@ -270,20 +610,27 @@ export default function ProfileScreen() {
             icon="lock-closed-outline"
             iconBg="#ef4444"
             title="Change PIN"
-            onPress={() => Alert.alert("Coming Soon", "PIN change will be available soon")}
+            onPress={() => safeAlert("Coming Soon", "PIN change will be available soon")}
           />
           <SettingsItem
             icon="key-outline"
             iconBg="#ec4899"
             title="Change Password"
-            onPress={() => Alert.alert("Coming Soon", "Password change will be available soon")}
+            onPress={() => safeAlert("Coming Soon", "Password change will be available soon")}
+          />
+          <SettingsItem
+            icon="time-outline"
+            iconBg="#f97316"
+            title="Auto-lock Timeout"
+            subtitle={timeoutLabel}
+            onPress={() => setShowTimeoutPicker(true)}
           />
           <ToggleItem
             icon="finger-print-outline"
             iconBg="#06b6d4"
             title="Biometric Login"
             value={biometricEnabled}
-            onValueChange={setBiometricEnabled}
+            onValueChange={handleBiometricToggle}
           />
         </Card>
         
@@ -301,14 +648,14 @@ export default function ProfileScreen() {
             iconBg="#f59e0b"
             title="Push Notifications"
             value={pushEnabled}
-            onValueChange={setPushEnabled}
+            onValueChange={handlePushToggle}
           />
           <ToggleItem
             icon="mail-outline"
             iconBg="#6366f1"
             title="Email Notifications"
             value={emailEnabled}
-            onValueChange={setEmailEnabled}
+            onValueChange={handleEmailToggle}
           />
         </Card>
         
@@ -320,14 +667,14 @@ export default function ProfileScreen() {
             iconBg="#10b981"
             title="Default Currency"
             subtitle="NGN"
-            onPress={() => Alert.alert("Coming Soon", "Currency selection will be available soon")}
+            onPress={() => safeAlert("Coming Soon", "Currency selection will be available soon")}
           />
           <SettingsItem
             icon="moon-outline"
             iconBg="#6366f1"
             title="Appearance"
             subtitle="Dark"
-            onPress={() => Alert.alert("Coming Soon", "Theme selection will be available soon")}
+            onPress={() => safeAlert("Coming Soon", "Theme selection will be available soon")}
           />
         </Card>
         
@@ -338,13 +685,13 @@ export default function ProfileScreen() {
             icon="help-circle-outline"
             iconBg="#3b82f6"
             title="Help Center"
-            onPress={() => Alert.alert("Help", "Visit our help center for FAQs and guides")}
+            onPress={() => safeAlert("Help", "Visit our help center for FAQs and guides")}
           />
           <SettingsItem
             icon="chatbubble-outline"
             iconBg="#10b981"
             title="Contact Support"
-            onPress={() => Alert.alert("Support", "Email us at support@kudiloop.com")}
+            onPress={() => safeAlert("Support", "Email us at support@kudiloop.com")}
           />
         </Card>
         
@@ -391,11 +738,51 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
         
+        {/* Delete Account - Apple App Store requirement */}
+        <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
+          <Pressable
+            onPress={handleDeleteAccount}
+            disabled={isDeleting}
+            style={({ pressed }) => ({
+              alignItems: "center",
+              padding: 16,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.error.DEFAULT,
+              opacity: pressed || isDeleting ? 0.6 : 1,
+            })}
+          >
+            {isDeleting ? (
+              <ActivityIndicator color={colors.error.DEFAULT} />
+            ) : (
+              <Text style={{ color: colors.error.DEFAULT, fontSize: 15, fontWeight: "500" }}>
+                Delete Account
+              </Text>
+            )}
+          </Pressable>
+          <Text style={{ 
+            color: colors.textSubtle, 
+            fontSize: 12, 
+            textAlign: "center",
+            marginTop: 8,
+          }}>
+            Permanently delete your account and all data
+          </Text>
+        </View>
+        
         {/* App Version */}
-        <Text style={{ color: '#4b5563', fontSize: 12, textAlign: 'center', paddingTop: 24 }}>
+        <Text style={{ color: '#4b5563', fontSize: 12, textAlign: 'center', paddingTop: 8 }}>
           KudiLoop v1.0.0
         </Text>
       </ScrollView>
+      
+      {/* Timeout Picker Bottom Sheet */}
+      <TimeoutPickerSheet
+        visible={showTimeoutPicker}
+        currentValue={currentTimeoutMinutes}
+        onSelect={handleTimeoutSelect}
+        onClose={() => setShowTimeoutPicker(false)}
+      />
     </SafeAreaView>
   );
 }

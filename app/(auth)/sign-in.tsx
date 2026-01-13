@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView, Alert } from "react-native";
+import { View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import { useSignIn, useSSO } from "@clerk/clerk-expo";
 import * as WebBrowser from "expo-web-browser";
 import { Button, Input, Divider } from "@/components/ui";
 import { colors } from "@/theme";
+import { safeAlert } from "@/utils/alertGate";
 
 // Required for OAuth to work properly
 WebBrowser.maybeCompleteAuthSession();
@@ -300,9 +301,16 @@ export default function SignInScreen() {
     }
   };
 
-  const handleSocialSignIn = useCallback(async (strategy: "oauth_google" | "oauth_apple") => {
+  const handleSocialSignIn = useCallback(async (provider: "google" | "apple" | "oauth_google" | "oauth_apple") => {
     if (!startSSOFlow) return;
-    
+
+    const strategy: "oauth_google" | "oauth_apple" =
+      provider === "oauth_google" || provider === "oauth_apple"
+        ? provider
+        : provider === "google"
+          ? "oauth_google"
+          : "oauth_apple";
+
     const providerName = strategy === "oauth_google" ? "Google" : "Apple";
     setSocialLoading(providerName);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -328,7 +336,7 @@ export default function SignInScreen() {
         return;
       }
       
-      Alert.alert(
+      safeAlert(
         "Sign In Failed",
         `Unable to sign in with ${providerName}. Please try again.`
       );
@@ -611,25 +619,60 @@ export default function SignInScreen() {
               </Button>
             </View>
 
-            {/* Social Sign In */}
+            {/* Social Sign In - Revolut Style */}
             <View style={{ marginTop: 32 }}>
-              <Divider label="or continue with" />
+              <Divider label="or" />
               
-              <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
-                <SocialButton
-                  icon="logo-google"
-                  label="Google"
-                  onPress={() => handleSocialSignIn("oauth_google")}
-                  loading={socialLoading === "Google"}
-                  disabled={!!socialLoading || loading}
-                />
-                <SocialButton
-                  icon="logo-apple"
-                  label="Apple"
-                  onPress={() => handleSocialSignIn("oauth_apple")}
-                  loading={socialLoading === "Apple"}
-                  disabled={!!socialLoading || loading}
-                />
+              <View style={{ 
+                marginTop: 24,
+                paddingHorizontal: 0,
+              }}>
+                {/* Google Button */}
+                <Pressable
+                  onPress={() => handleSocialSignIn("google")}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    borderWidth: 1,
+                    borderColor: "rgba(255, 255, 255, 0.2)",
+                    marginBottom: 12,
+                  }}
+                >
+                  <View style={{ position: "absolute", left: 20 }}>
+                    <Ionicons name="logo-google" size={22} color="#FFFFFF" />
+                  </View>
+                  <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "600" }}>
+                    Continue with Google
+                  </Text>
+                </Pressable>
+
+                {/* Apple Button */}
+                <Pressable
+                  onPress={() => handleSocialSignIn("apple")}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    borderWidth: 1,
+                    borderColor: "rgba(255, 255, 255, 0.2)",
+                  }}
+                >
+                  <View style={{ position: "absolute", left: 20 }}>
+                    <Ionicons name="logo-apple" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "600" }}>
+                    Continue with Apple
+                  </Text>
+                </Pressable>
               </View>
             </View>
 
@@ -659,48 +702,3 @@ export default function SignInScreen() {
   );
 }
 
-function SocialButton({ 
-  icon, 
-  label, 
-  onPress,
-  loading = false,
-  disabled = false,
-}: { 
-  icon: keyof typeof Ionicons.glyphMap; 
-  label: string; 
-  onPress: () => void;
-  loading?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => ({
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        paddingVertical: 14,
-        borderRadius: 14,
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        opacity: disabled ? 0.5 : pressed ? 0.7 : 1,
-        transform: [{ scale: pressed && !disabled ? 0.98 : 1 }],
-      })}
-    >
-      {loading ? (
-        <Text style={{ color: colors.textMuted, fontSize: 15 }}>Loading...</Text>
-      ) : (
-        <>
-          <Ionicons name={icon} size={20} color={colors.text} />
-          <Text style={{ color: colors.text, fontSize: 15, fontWeight: "500" }}>
-            {label}
-          </Text>
-        </>
-      )}
-    </Pressable>
-  );
-}

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useOnlineSync } from '@/hooks/useOnlineSync';
+import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 
 export default function AppLayout() {
   const { 
@@ -18,10 +19,19 @@ export default function AppLayout() {
   } = useAuth();
   
   // Initialize push notifications
-  const { expoPushToken, notification } = usePushNotifications();
+  const { expoPushToken } = usePushNotifications();
   
   // Initialize online sync (processes queued mutations when back online)
   const { isOffline } = useOnlineSync();
+  
+  // Initialize session timeout (locks app after inactivity)
+  const { registerActivity } = useSessionTimeout({
+    onTimeout: () => {
+      if (__DEV__) {
+        console.log('🔐 Session timed out - user sent to PIN entry');
+      }
+    },
+  });
   
   // Log token for testing (only in dev)
   useEffect(() => {
@@ -29,13 +39,6 @@ export default function AppLayout() {
       console.log('📱 Push token ready:', expoPushToken);
     }
   }, [expoPushToken]);
-  
-  // Log incoming notifications (only in dev)
-  useEffect(() => {
-    if (__DEV__ && notification) {
-      console.log('📬 New notification:', notification.request.content.title);
-    }
-  }, [notification]);
   
   // Log offline status changes (only in dev)
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, TextInput, Image, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, ScrollView, Pressable, TextInput, Image, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -260,7 +261,7 @@ export default function EditProfileScreen() {
   const pickImage = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    Alert.alert(
+    safeAlert(
       "Change Photo",
       "Choose an option",
       [
@@ -269,7 +270,7 @@ export default function EditProfileScreen() {
           onPress: async () => {
             const { status } = await ImagePicker.requestCameraPermissionsAsync();
             if (status !== 'granted') {
-              Alert.alert("Permission Required", "Camera access is needed to take photos.");
+              safeAlert("Permission Required", "Camera access is needed to take photos.");
               return;
             }
             
@@ -297,7 +298,7 @@ export default function EditProfileScreen() {
           onPress: async () => {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-              Alert.alert("Permission Required", "Photo library access is needed.");
+              safeAlert("Permission Required", "Photo library access is needed.");
               return;
             }
             
@@ -419,7 +420,7 @@ export default function EditProfileScreen() {
         console.error('Error message:', error.message);
         console.error('Error response:', error.response?.data);
       }
-      Alert.alert("Error", error.message || "Failed to update profile. Please try again.");
+      safeAlert("Error", error.message || "Failed to update profile. Please try again.");
     }
   };
   

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { View, Text, Pressable, Platform, Alert } from "react-native";
+import { useState, useEffect, useRef } from "react";
+import { View, Text, Pressable, Platform, InteractionManager } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,13 +8,32 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { Button } from "@/components/ui";
 import { colors } from "@/theme";
 import { secureStorage } from "@/services/secureStorage";
+import { safeAlert } from "@/utils/alertGate";
 
 export default function BiometricSetupScreen() {
   const [biometricType, setBiometricType] = useState<"face" | "fingerprint" | null>(null);
   const [loading, setLoading] = useState(false);
+  const isMountedRef = useRef(true);
 
+  // Track mounted state
   useEffect(() => {
-    checkBiometrics();
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Delay biometric check to ensure UI is ready (prevents iOS crash)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      InteractionManager.runAfterInteractions(() => {
+        if (isMountedRef.current) {
+          checkBiometrics();
+        }
+      });
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const checkBiometrics = async () => {
@@ -22,7 +41,7 @@ export default function BiometricSetupScreen() {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
       
-      if (hasHardware && isEnrolled) {
+      if (hasHardware && isEnrolled && isMountedRef.current) {
         const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
         if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
           setBiometricType("face");
@@ -41,36 +60,45 @@ export default function BiometricSetupScreen() {
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: `Enable ${biometricType === "face" ? "Face ID" : "Fingerprint"}`,
-        disableDeviceFallback: true,
-        cancelLabel: "Cancel",
-      });
+    // Wrap biometric authentication in InteractionManager for iOS safety
+    InteractionManager.runAfterInteractions(async () => {
+      try {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: `Enable ${biometricType === "face" ? "Face ID" : "Fingerprint"}`,
+          disableDeviceFallback: true,
+          cancelLabel: "Cancel",
+        });
 
-      if (result.success) {
-        // Save biometric preference securely
-        await secureStorage.setBiometricEnabled(true);
-        await secureStorage.updateLastAuthTime();
-        
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        handleComplete();
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        if (result.error === "user_cancel") {
-          // User cancelled, don't show error
-        } else if (result.error) {
-          Alert.alert("Authentication Failed", "Please try again.");
+        if (!isMountedRef.current) return;
+
+        if (result.success) {
+          // Save biometric preference securely
+          await secureStorage.setBiometricEnabled(true);
+          await secureStorage.updateLastAuthTime();
+          
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          handleComplete();
+        } else {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          if (result.error === "user_cancel") {
+            // User cancelled, don't show error
+          } else if (result.error) {
+            safeAlert("Authentication Failed", "Please try again.");
+          }
+        }
+      } catch (error) {
+        if (__DEV__) {
+          console.log("Biometric error:", error);
+        }
+        if (isMountedRef.current) {
+          safeAlert("Error", "Failed to enable biometric authentication.");
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setLoading(false);
         }
       }
-    } catch (error) {
-      if (__DEV__) {
-        console.log("Biometric error:", error);
-      }
-      Alert.alert("Error", "Failed to enable biometric authentication.");
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handleComplete = () => {

@@ -152,9 +152,11 @@ api.interceptors.response.use(
   async (error: AxiosError<ApiError>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     
-    // Check if this is a network error while offline - suppress logging
+    // Check if this is a network error - suppress logging for all network errors
+    // Network errors are expected in mobile apps (connectivity changes, server issues, etc.)
     const isNetworkError = !error.response;
-    const shouldSuppressError = isOffline && isNetworkError;
+    // Suppress network errors always to avoid flooding logs and showing errors to users
+    const shouldSuppressError = isNetworkError;
     
     // Handle 401 - attempt to refresh token and retry (only when online)
     if (!isOffline && error.response?.status === 401 && !originalRequest._retry && tokenRefresher) {
@@ -193,9 +195,10 @@ api.interceptors.response.use(
       }
     }
     
-    // Only log errors when online and in dev (suppress expected offline errors)
+    // Only log server errors (non-network errors) in dev mode
+    // Use console.log instead of console.error to avoid triggering error overlays
     if (isDev && !shouldSuppressError) {
-      console.error(`❌ ${error.config?.url} - ${error.response?.status || 'Network Error'}`);
+      console.log(`⚠️ ${error.config?.url} - ${error.response?.status}`);
       // Don't log full error data - may contain sensitive info
     }
     
@@ -214,10 +217,7 @@ api.interceptors.response.use(
       console.log('🔍 Resource not found');
     }
     
-    // Network errors are expected when offline - don't log
-    if (isNetworkError && !isOffline && isDev) {
-      console.log('📡 Network error - check your connection');
-    }
+    // Network errors are now suppressed - no logging needed
     
     return Promise.reject(error);
   }

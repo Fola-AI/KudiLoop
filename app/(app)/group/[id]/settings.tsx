@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, Switch, Alert, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, Switch, ActivityIndicator } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -67,7 +68,7 @@ export default function GroupSettingsScreen() {
     } catch (error: any) {
       setHideBeneficiary(previousValue);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update setting';
-      Alert.alert('Error', errorMessage);
+      safeAlert('Error', errorMessage);
       if (__DEV__) console.error('Toggle beneficiary error:', error);
     }
   }, [updateGroup, hasAdminPrivileges, hideBeneficiary]);
@@ -88,7 +89,7 @@ export default function GroupSettingsScreen() {
     } catch (error: any) {
       setHideSchedule(previousValue);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update setting';
-      Alert.alert('Error', errorMessage);
+      safeAlert('Error', errorMessage);
       if (__DEV__) console.error('Toggle schedule error:', error);
     }
   }, [updateGroup, hasAdminPrivileges, hideSchedule]);
@@ -105,7 +106,9 @@ export default function GroupSettingsScreen() {
     // If not admin (isCurrentlyAdmin=false), send true to make admin
     const newAdminStatus = !isCurrentlyAdmin;
     
-    console.log('🔧 [CO-ADMIN] Starting toggle:', { memberId, memberName, isCurrentlyAdmin, newAdminStatus });
+    if (__DEV__) {
+      console.log('🔧 [CO-ADMIN] Starting toggle:', { memberId, memberName, isCurrentlyAdmin, newAdminStatus });
+    }
     
     try {
       // Toggle co-admin status - API expects { isAdmin: boolean }
@@ -113,7 +116,9 @@ export default function GroupSettingsScreen() {
         isAdmin: newAdminStatus
       });
       
-      console.log('🔧 [CO-ADMIN] API Response:', response.status, JSON.stringify(response?.data));
+      if (__DEV__) {
+        console.log('🔧 [CO-ADMIN] API Response:', response.status, JSON.stringify(response?.data));
+      }
       
       // Invalidate and refetch to get persisted data from server
       await queryClient.invalidateQueries({ queryKey: ['groups', id, 'members'] });
@@ -122,10 +127,12 @@ export default function GroupSettingsScreen() {
       
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      console.log('🔧 [CO-ADMIN] Error:', error?.response?.status, error?.response?.data || error?.message);
+      if (__DEV__) {
+        console.log('🔧 [CO-ADMIN] Error:', error?.response?.status, error?.response?.data || error?.message);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update admin status';
-      Alert.alert('Error', errorMessage);
+      safeAlert('Error', errorMessage);
       if (__DEV__) console.error('Toggle co-admin error:', error);
     } finally {
       setIsUpdatingAdmin(null);
@@ -142,12 +149,12 @@ export default function GroupSettingsScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['groups'] });
       
-      Alert.alert('Success', 'You have left the group.', [
+      safeAlert('Success', 'You have left the group.', [
         { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/groups') }
       ]);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to leave group. Please try again.');
+      safeAlert('Error', error.response?.data?.message || 'Failed to leave group. Please try again.');
     } finally {
       setIsExiting(false);
     }
@@ -163,12 +170,12 @@ export default function GroupSettingsScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['groups'] });
       
-      Alert.alert('Success', 'Group has been deleted.', [
+      safeAlert('Success', 'Group has been deleted.', [
         { text: 'OK', onPress: () => router.replace('/(app)/(tabs)/groups') }
       ]);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to delete group. Please try again.');
+      safeAlert('Error', error.response?.data?.message || 'Failed to delete group. Please try again.');
     } finally {
       setIsExiting(false);
     }
@@ -342,7 +349,7 @@ export default function GroupSettingsScreen() {
                   <Pressable
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      Alert.alert('Coming Soon', 'Edit group feature will be available soon.');
+                      safeAlert('Coming Soon', 'Edit group feature will be available soon.');
                     }}
                     style={({ pressed }) => ({
                       alignItems: 'center',
@@ -465,14 +472,14 @@ export default function GroupSettingsScreen() {
                 <Pressable
                   onPress={() => {
                     if (!canExitGroup) {
-                      Alert.alert(
+                      safeAlert(
                         'Cannot Delete',
                         'You cannot delete an active group. Wait until all cycles are completed.'
                       );
                       return;
                     }
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    Alert.alert(
+                    safeAlert(
                       'Delete Group',
                       'Are you sure you want to delete this group? This action cannot be undone and all members will be removed.',
                       [
@@ -523,14 +530,14 @@ export default function GroupSettingsScreen() {
                 <Pressable
                   onPress={() => {
                     if (!canExitGroup) {
-                      Alert.alert(
+                      safeAlert(
                         'Cannot Leave',
                         'You cannot leave an active group. Wait until all cycles are completed.'
                       );
                       return;
                     }
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    Alert.alert(
+                    safeAlert(
                       'Leave Group',
                       'Are you sure you want to leave this group? You will need a new invitation to rejoin.',
                       [

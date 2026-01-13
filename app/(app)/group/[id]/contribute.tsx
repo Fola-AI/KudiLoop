@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, Image, Alert, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, Image, ActivityIndicator } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -91,12 +92,14 @@ export default function ContributeScreen() {
     : undefined;
 
   // Debug log
-  console.log('📋 Contribute screen debug:', {
-    currentUserId,
-    myMemberId: myMember?.id,
-    myContributionId: myContribution?.id,
-    contributionsCount: contributionsList.length,
-  });
+  if (__DEV__) {
+    console.log('📋 Contribute screen debug:', {
+      currentUserId,
+      myMemberId: myMember?.id,
+      myContributionId: myContribution?.id,
+      contributionsCount: contributionsList.length,
+    });
+  }
   
   // Find current beneficiary (member whose rotation order matches current cycle)
   const currentCycle = group.currentCycle || 1;
@@ -261,7 +264,7 @@ export default function ContributeScreen() {
   const requestCameraPermission = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
+      safeAlert(
         'Permission Required',
         'Camera access is needed to take receipt photos.',
         [{ text: 'OK' }]
@@ -274,7 +277,7 @@ export default function ContributeScreen() {
   const requestGalleryPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
+      safeAlert(
         'Permission Required',
         'Photo library access is needed to select receipt images.',
         [{ text: 'OK' }]
@@ -347,13 +350,13 @@ export default function ContributeScreen() {
   // Submit payment request WITH receipt
   const handleSubmitPaymentWithReceipt = async () => {
     if (!selectedImage) {
-      Alert.alert('No Receipt', 'Please select a receipt image first.');
+      safeAlert('No Receipt', 'Please select a receipt image first.');
       return;
     }
     
     // Need contribution ID to upload receipt
     if (!myContribution?.id) {
-      Alert.alert(
+      safeAlert(
         'Error', 
         'Could not find your contribution record. Please pull to refresh the group page and try again.'
       );
@@ -363,21 +366,27 @@ export default function ContributeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     try {
-      console.log('📤 Uploading receipt for contribution:', myContribution.id);
+      if (__DEV__) {
+        console.log('📤 Uploading receipt for contribution:', myContribution.id);
+      }
       
       await uploadReceipt.mutateAsync({
         contributionId: myContribution.id,
         imageUri: selectedImage,
       });
       
-      console.log('✅ Receipt uploaded successfully');
+      if (__DEV__) {
+        console.log('✅ Receipt uploaded successfully');
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep("success");
       
     } catch (error: any) {
-      console.error('❌ Upload error:', error);
+      if (__DEV__) {
+        console.error('❌ Upload error:', error);
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(
+      safeAlert(
         'Upload Failed', 
         error.response?.data?.message || error.message || 'Failed to upload receipt. Please try again.'
       );
@@ -389,7 +398,7 @@ export default function ContributeScreen() {
   const handleContinueWithoutReceipt = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    Alert.alert(
+    safeAlert(
       'Continue Without Receipt?',
       'Your payment will be recorded as pending. The admin can approve it manually, or you can upload a receipt later.',
       [
@@ -446,7 +455,7 @@ export default function ContributeScreen() {
               <Pressable
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  Alert.alert("Copied!", "Account number copied to clipboard");
+                  safeAlert("Copied!", "Account number copied to clipboard");
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center' }}
               >

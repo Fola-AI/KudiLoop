@@ -28,7 +28,11 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_ENV": "production"
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://kudiloop.onrender.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bWludC1tb25hcmNoLTI0LmNsZXJrLmFjY291bnRzLmRldiQ",
+        "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME": "dv5up7vpe",
+        "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET": "kudiloop_receipts"
       },
       "channel": "production"
     }
@@ -36,9 +40,9 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "YOUR_APPLE_ID_EMAIL",
-        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
-        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+        "appleId": "afolinks@outlook.com",
+        "ascAppId": "6756009015",
+        "appleTeamId": "7WQ97NM6W7"
       },
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",

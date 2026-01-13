@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, Stack, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -477,7 +478,7 @@ export default function ScheduleScreen() {
         const cycle = allCycles[i];
         if (!cycle.member?.id) {
           if (__DEV__) console.error(`Cycle ${i + 1} has no valid member ID:`, cycle);
-          Alert.alert('Error', `Cannot save: Cycle ${i + 1} has no valid member assigned.`);
+          safeAlert('Error', `Cannot save: Cycle ${i + 1} has no valid member assigned.`);
           return;
         }
         rotationUpdates.push({
@@ -535,7 +536,7 @@ export default function ScheduleScreen() {
       }
       
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', 'Rotation order has been updated!');
+      safeAlert('Success', 'Rotation order has been updated!');
       
     } catch (error: any) {
       if (__DEV__) {
@@ -552,7 +553,7 @@ export default function ScheduleScreen() {
       // Use the centralized error message extractor
       const errorMessage = getErrorMessage(error);
       
-      Alert.alert('Unable to Save', errorMessage);
+      safeAlert('Unable to Save', errorMessage);
     }
   }, [localUpcomingCycles, id, schedule, refetchGroup, refetchMembers, updateRotationOrder, queryClient]);
   

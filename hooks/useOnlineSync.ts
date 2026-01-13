@@ -4,6 +4,7 @@ import { useNetworkStatus } from './useNetworkStatus';
 import { processPendingMutations, getPendingMutationsCount } from './useOfflineMutation';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
+import { useUIReady } from '@/contexts/UIReadyContext';
 
 /**
  * Mutation handlers for processing offline actions
@@ -62,6 +63,16 @@ export function useOnlineSync() {
   const wasOffline = useRef(false);
   const queryClient = useQueryClient();
   const isSyncing = useRef(false);
+  const isMounted = useRef(true);
+  const { safelyShowAlert } = useUIReady();
+  
+  useEffect(() => {
+    isMounted.current = true;
+    
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
   
   useEffect(() => {
     // Detect transition from offline to online
@@ -91,18 +102,18 @@ export function useOnlineSync() {
         // Process pending mutations
         const { processed, failed } = await processPendingMutations(mutationHandlers);
         
-        // Show result to user
-        if (processed > 0 || failed > 0) {
+        // Show result to user only if component is still mounted
+        if (isMounted.current && (processed > 0 || failed > 0)) {
           if (failed > 0) {
-            Alert.alert(
+            safelyShowAlert(() => Alert.alert(
               'Sync Complete',
               `Synced ${processed} action(s). ${failed} failed and will retry later.`
-            );
+            ));
           } else if (processed > 0) {
-            Alert.alert(
+            safelyShowAlert(() => Alert.alert(
               'Back Online',
               `Successfully synced ${processed} offline action(s).`
-            );
+            ));
           }
         }
       }
@@ -115,7 +126,9 @@ export function useOnlineSync() {
       }
       
     } catch (error) {
-      console.error('Sync error:', error);
+      if (__DEV__) {
+        console.error('Sync error:', error);
+      }
     } finally {
       isSyncing.current = false;
     }

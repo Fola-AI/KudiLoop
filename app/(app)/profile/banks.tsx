@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, TextInput, Alert, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -46,7 +47,7 @@ function BankDetailRow({
   const handleCopy = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(value);
-    Alert.alert("Copied!", `${label} copied to clipboard`);
+    safeAlert("Copied!", `${label} copied to clipboard`);
   };
   
   // Truncate long values manually for cleaner display
@@ -395,10 +396,10 @@ export default function BankAccountsScreen() {
       
       setEditMode(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Success", "Bank details saved successfully!");
+      safeAlert("Success", "Bank details saved successfully!");
     } catch (error: any) {
       if (__DEV__) console.error('Failed to save bank details:', error);
-      Alert.alert("Error", error.message || "Failed to save bank details. Please try again.");
+      safeAlert("Error", error.message || "Failed to save bank details. Please try again.");
     }
   };
   

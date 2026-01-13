@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
-import { Alert } from 'react-native';
 import { useNetworkStatus } from './useNetworkStatus';
+import { safeAlert } from '@/utils/alertGate';
 
 const PENDING_MUTATIONS_KEY = 'kudiloop-pending-mutations';
 
@@ -67,7 +67,7 @@ export async function queueMutation(type: string, data: any): Promise<void> {
     
     await secureQueueStorage.set(mutations);
     
-    Alert.alert(
+    safeAlert(
       'Saved Offline',
       'Your action will be synced when you\'re back online.'
     );
@@ -80,7 +80,7 @@ export async function queueMutation(type: string, data: any): Promise<void> {
     if (__DEV__) {
       console.error('Failed to queue mutation:', error);
     }
-    Alert.alert('Error', 'Failed to save action for offline. Please try again.');
+    safeAlert('Error', 'Failed to save action for offline. Please try again.');
   }
 }
 

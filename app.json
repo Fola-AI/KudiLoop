@@ -2,6 +2,7 @@
   "expo": {
     "name": "KudiLoop",
     "slug": "kudiloop",
+    "scheme": "kudiloop",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,11 +19,22 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.kudiloop.app",
-      "buildNumber": "1",
+      "buildNumber": "8",
       "infoPlist": {
         "NSCameraUsageDescription": "KudiLoop needs camera access to take photos of payment receipts.",
         "NSPhotoLibraryUsageDescription": "KudiLoop needs photo library access to upload payment receipts.",
-        "NSFaceIDUsageDescription": "KudiLoop uses Face ID for secure authentication."
+        "NSFaceIDUsageDescription": "KudiLoop uses Face ID for secure authentication.",
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "kudiloop"
+            ]
+          }
+        ]
       }
     },
     "android": {
@@ -35,6 +47,12 @@
       "package": "com.kudiloop.app",
       "versionCode": 1,
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -62,13 +80,24 @@
           "photosPermission": "KudiLoop needs access to your photos to upload payment receipts.",
           "cameraPermission": "KudiLoop needs access to your camera to take photos of payment receipts."
         }
-      ]
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "KudiLoop uses Face ID for secure authentication."
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
       "router": {},
       "eas": {
         "projectId": "8fa91152-38cb-427d-84ac-6f640446bc2e"
       }
+    },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/8fa91152-38cb-427d-84ac-6f640446bc2e"
     }
   }
 }

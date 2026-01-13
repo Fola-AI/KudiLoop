@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, ActivityIndicator } from "react-native";
+import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -39,7 +40,7 @@ export default function JoinGroupScreen() {
     
     // If not signed in, redirect to auth
     if (!isSignedIn) {
-      Alert.alert(
+      safeAlert(
         "Sign In Required",
         "You need to sign in or create an account to join this group.",
         [
@@ -67,11 +68,11 @@ export default function JoinGroupScreen() {
       const message = err?.response?.data?.message || err.message || 'Failed to join group';
       
       if (message.toLowerCase().includes('already')) {
-        Alert.alert("Already a Member", "You're already a member of this group.", [
+        safeAlert("Already a Member", "You're already a member of this group.", [
           { text: "Go to Group", onPress: () => router.replace(`/group/${inviteData.group.id}`) }
         ]);
       } else {
-        Alert.alert("Error", message);
+        safeAlert("Error", message);
       }
     } finally {
       setIsJoining(false);

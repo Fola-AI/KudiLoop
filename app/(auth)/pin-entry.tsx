@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { View, Text, Pressable, Alert } from "react-native";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { View, Text, Pressable, InteractionManager } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { colors } from "@/theme";
 import { secureStorage } from "@/services/secureStorage";
 import { sanitize } from "@/utils/sanitize";
+import { safeAlert } from "@/utils/alertGate";
 
 const PIN_LENGTH = 4;
 
@@ -19,11 +20,29 @@ export default function PinEntryScreen() {
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
   const [attemptsRemaining, setAttemptsRemaining] = useState(5);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const isMountedRef = useRef(true);
+
+  // Track mounted state
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Check lockout status on mount
   useEffect(() => {
     checkLockoutStatus();
-    checkBiometricAvailability();
+    // Delay biometric check to ensure UI is ready
+    const timer = setTimeout(() => {
+      InteractionManager.runAfterInteractions(() => {
+        if (isMountedRef.current) {
+          checkBiometricAvailability();
+        }
+      });
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   // Countdown timer for lockout
@@ -63,13 +82,24 @@ export default function PinEntryScreen() {
       
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      setBiometricAvailable(hasHardware && isEnrolled);
+      
+      if (isMountedRef.current) {
+        setBiometricAvailable(hasHardware && isEnrolled);
+      }
       
       // Auto-prompt biometric if available and not locked out
+      // Delay biometric prompt to ensure UI is fully ready (prevents iOS crash)
       if (hasHardware && isEnrolled) {
         const lockoutStatus = await secureStorage.isLockedOut();
         if (!lockoutStatus.locked) {
-          promptBiometric();
+          // Additional delay for biometric prompt on iOS
+          setTimeout(() => {
+            InteractionManager.runAfterInteractions(() => {
+              if (isMountedRef.current) {
+                promptBiometric();
+              }
+            });
+          }, 300);
         }
       }
     } catch (error) {
@@ -111,6 +141,7 @@ export default function PinEntryScreen() {
       
       if (result.success) {
         await secureStorage.updateLastAuthTime();
+        await secureStorage.resetAttempts();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.replace("/(app)/(tabs)");
       } else if (result.lockedOut) {
@@ -118,7 +149,7 @@ export default function PinEntryScreen() {
         setLockoutRemaining(result.lockoutRemainingMs || 5 * 60 * 1000);
         setPin("");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert(
+        safeAlert(
           "Too Many Attempts",
           "Your account has been locked for 5 minutes due to too many failed attempts."
         );
@@ -377,7 +408,7 @@ export default function PinEntryScreen() {
         {/* Forgot PIN Link */}
         <Pressable 
           onPress={() => {
-            Alert.alert(
+            safeAlert(
               "Forgot PIN?",
               "You'll need to sign out and sign back in to reset your PIN.",
               [

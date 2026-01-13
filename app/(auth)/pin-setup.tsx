@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, Pressable, Alert } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,7 @@ import * as Haptics from "expo-haptics";
 import { colors } from "@/theme";
 import { secureStorage } from "@/services/secureStorage";
 import { sanitize } from "@/utils/sanitize";
+import { safeAlert } from "@/utils/alertGate";
 
 const PIN_LENGTH = 4;
 
@@ -33,7 +34,7 @@ export default function PinSetupScreen() {
         if (__DEV__) console.log("Failed to save PIN:", err);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", "Failed to save PIN. Please try again.");
+      safeAlert("Error", "Failed to save PIN. Please try again.");
       setConfirmPin("");
       setPin("");
       setStep("create");
