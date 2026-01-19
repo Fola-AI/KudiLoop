@@ -3,7 +3,7 @@
     "name": "KudiLoop",
     "slug": "kudiloop",
     "scheme": "kudiloop",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -19,7 +19,7 @@
       "newArchEnabled": true,
       "supportsTablet": false,
       "bundleIdentifier": "com.kudiloop.app",
-      "buildNumber": "8",
+      "buildNumber": "12",
       "infoPlist": {
         "NSCameraUsageDescription": "KudiLoop needs camera access to take photos of payment receipts.",
         "NSPhotoLibraryUsageDescription": "KudiLoop needs photo library access to upload payment receipts.",
