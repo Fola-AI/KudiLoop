@@ -120,6 +120,9 @@ export default function PinEntryScreen() {
       if (result.success) {
         await secureStorage.updateLastAuthTime();
         await secureStorage.resetAttempts();
+        await secureStorage.setAppLocked(false);
+        await secureStorage.clearAppBackgroundTime();
+        await secureStorage.resetBiometricFailedAttempts();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.replace("/(app)/(tabs)");
       }
@@ -142,6 +145,9 @@ export default function PinEntryScreen() {
       if (result.success) {
         await secureStorage.updateLastAuthTime();
         await secureStorage.resetAttempts();
+        await secureStorage.setAppLocked(false);
+        await secureStorage.clearAppBackgroundTime();
+        await secureStorage.resetBiometricFailedAttempts();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.replace("/(app)/(tabs)");
       } else if (result.lockedOut) {

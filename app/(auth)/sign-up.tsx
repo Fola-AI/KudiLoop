@@ -6,12 +6,38 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useSignUp, useSSO } from "@clerk/clerk-expo";
 import * as WebBrowser from "expo-web-browser";
+import * as LocalAuthentication from "expo-local-authentication";
 import { Button, Input, Divider } from "@/components/ui";
 import { colors } from "@/theme";
 import { safeAlert } from "@/utils/alertGate";
+import { secureStorage } from "@/services/secureStorage";
 
 // Required for OAuth to work properly
 WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * Check if user needs biometric/PIN setup and navigate accordingly
+ * For new sign-ups, always require biometric setup
+ */
+async function navigateAfterAuth() {
+  try {
+    // Check device capabilities
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    
+    if (hasHardware && isEnrolled) {
+      // Device supports biometrics - go to biometric setup
+      router.replace("/(auth)/biometric-setup");
+    } else {
+      // No biometrics available - go to PIN setup
+      router.replace("/(auth)/pin-setup");
+    }
+  } catch (error) {
+    if (__DEV__) console.log("Error in navigateAfterAuth:", error);
+    // Fallback to biometric setup screen which handles edge cases
+    router.replace("/(auth)/biometric-setup");
+  }
+}
 
 export default function SignUpScreen() {
   const { signUp, setActive, isLoaded } = useSignUp();
@@ -113,7 +139,8 @@ export default function SignUpScreen() {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace("/(app)/(tabs)");
+        // New sign-up - always require biometric/PIN setup
+        await navigateAfterAuth();
       } else {
         if (__DEV__) console.log("Verification status:", result.status);
         setErrors({ verification: "Verification incomplete. Please try again." });
@@ -156,7 +183,8 @@ export default function SignUpScreen() {
       if (createdSessionId && ssoSetActive) {
         await ssoSetActive({ session: createdSessionId });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace("/(app)/(tabs)");
+        // Check if this is returning user or new - navigate to biometric setup
+        await navigateAfterAuth();
       }
     } catch (err: any) {
       if (__DEV__) console.log(`${providerName} sign up error:`, err);

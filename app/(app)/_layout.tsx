@@ -1,6 +1,6 @@
 import { Stack, Redirect } from 'expo-router';
-import { View, ActivityIndicator, Text, Pressable } from 'react-native';
-import { useEffect } from 'react';
+import { View, ActivityIndicator, Text, Pressable, GestureResponderEvent } from 'react-native';
+import { useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/theme';
@@ -25,13 +25,24 @@ export default function AppLayout() {
   const { isOffline } = useOnlineSync();
   
   // Initialize session timeout (locks app after inactivity)
-  const { registerActivity } = useSessionTimeout({
+  // Now with 2-minute default timeout and biometric unlock
+  const { registerActivity, isLocked } = useSessionTimeout({
+    onLock: () => {
+      if (__DEV__) {
+        console.log('🔐 App locked - showing biometric unlock');
+      }
+    },
     onTimeout: () => {
       if (__DEV__) {
-        console.log('🔐 Session timed out - user sent to PIN entry');
+        console.log('🔐 Session timed out - user signed out');
       }
     },
   });
+  
+  // Handle user activity (touch events)
+  const handleActivity = useCallback(() => {
+    registerActivity();
+  }, [registerActivity]);
   
   // Log token for testing (only in dev)
   useEffect(() => {
@@ -168,12 +179,18 @@ export default function AppLayout() {
   }
   
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-        animation: 'slide_from_right',
-      }}
-    />
+    <View 
+      style={{ flex: 1 }} 
+      onTouchStart={handleActivity}
+      onTouchMove={handleActivity}
+    >
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+          animation: 'slide_from_right',
+        }}
+      />
+    </View>
   );
 }

@@ -6,12 +6,55 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useSignIn, useSSO } from "@clerk/clerk-expo";
 import * as WebBrowser from "expo-web-browser";
+import * as LocalAuthentication from "expo-local-authentication";
 import { Button, Input, Divider } from "@/components/ui";
 import { colors } from "@/theme";
 import { safeAlert } from "@/utils/alertGate";
+import { secureStorage } from "@/services/secureStorage";
 
 // Required for OAuth to work properly
 WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * Check if user needs biometric/PIN setup and navigate accordingly
+ * This is called after successful sign-in
+ */
+async function navigateAfterAuth() {
+  try {
+    // Check if biometric setup is already complete
+    const setupComplete = await secureStorage.isBiometricSetupComplete();
+    const hasBiometric = await secureStorage.isBiometricEnabled();
+    const hasPin = await secureStorage.hasPinSet();
+    
+    if (setupComplete && (hasBiometric || hasPin)) {
+      // Security already set up - go to app
+      await secureStorage.updateLastAuthTime();
+      router.replace("/(app)/(tabs)");
+      return;
+    }
+    
+    // Check device capabilities
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    
+    if (hasHardware && isEnrolled) {
+      // Device supports biometrics - go to biometric setup
+      router.replace("/(auth)/biometric-setup");
+    } else if (hasPin) {
+      // Has PIN but no biometrics available - go to app
+      await secureStorage.setBiometricSetupComplete(true);
+      await secureStorage.updateLastAuthTime();
+      router.replace("/(app)/(tabs)");
+    } else {
+      // No biometrics available, no PIN - go to PIN setup
+      router.replace("/(auth)/pin-setup");
+    }
+  } catch (error) {
+    if (__DEV__) console.log("Error in navigateAfterAuth:", error);
+    // Fallback to biometric setup screen which handles edge cases
+    router.replace("/(auth)/biometric-setup");
+  }
+}
 
 type VerificationStep = "credentials" | "email_code" | "phone_code" | "totp";
 type VerificationFactorType = "first_factor" | "second_factor";
@@ -84,10 +127,10 @@ export default function SignInScreen() {
       if (__DEV__) console.log("Sign in result:", result.status);
 
       if (result.status === "complete") {
-        // Sign in successful - go to app
+        // Sign in successful - check biometric setup
         await setActive({ session: result.createdSessionId });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace("/(app)/(tabs)");
+        await navigateAfterAuth();
         
       } else if (result.status === "needs_second_factor") {
         // 2FA required (only if Client Trust or 2FA is explicitly enabled)
@@ -185,13 +228,13 @@ export default function SignInScreen() {
           general: "This account was created with Google or Apple Sign In. Please use those options below to sign in." 
         });
       } else if (errorCode === "session_exists") {
-        // Already signed in, just navigate
-        router.replace("/(app)/(tabs)");
+        // Already signed in, check biometric setup
+        await navigateAfterAuth();
       } else if (errorCode === "form_identifier_exists") {
         setErrors({ email: "This email is already registered. Please sign in." });
       } else if (errorCode === "identifier_already_signed_in") {
-        // User is already signed in
-        router.replace("/(app)/(tabs)");
+        // User is already signed in, check biometric setup
+        await navigateAfterAuth();
       } else {
         setErrors({ general: errorMessage || "Sign in failed. Please try again." });
       }
@@ -238,7 +281,7 @@ export default function SignInScreen() {
       if (result?.status === "complete") {
         await setActive({ session: result.createdSessionId });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace("/(app)/(tabs)");
+        await navigateAfterAuth();
       } else {
         if (__DEV__) console.log("Verification result:", result?.status);
         setErrors({ code: "Verification incomplete. Please try again." });
@@ -325,7 +368,7 @@ export default function SignInScreen() {
       if (createdSessionId && ssoSetActive) {
         await ssoSetActive({ session: createdSessionId });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace("/(app)/(tabs)");
+        await navigateAfterAuth();
       }
     } catch (err: any) {
       if (__DEV__) console.log(`${providerName} sign in error:`, err);

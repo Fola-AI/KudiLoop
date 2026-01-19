@@ -113,6 +113,12 @@ function getUserId(req: any): string {
   throw new Error('User ID not found in request');
 }
 
+function normalizeBoolean(value: unknown): 0 | 1 | null {
+  if (value === true || value === 1 || value === "1") return 1;
+  if (value === false || value === 0 || value === "0") return 0;
+  return null;
+}
+
 // Clerk authentication middleware (replaces JWT auth)
 const authMiddleware = clerkAuthMiddleware;
 
@@ -983,9 +989,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/groups/:id/schedule-visibility", authMiddleware, async (req: any, res) => {
     try {
       const userId = getUserId(req);
-      const { scheduleVisibility } = req.body;
-
-      if (scheduleVisibility !== 0 && scheduleVisibility !== 1) {
+      const normalizedScheduleVisibility = normalizeBoolean(req.body.scheduleVisibility);
+      if (normalizedScheduleVisibility === null) {
         return res.status(400).json({ error: "Schedule visibility must be 0 or 1" });
       }
 
@@ -998,7 +1003,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Only the group owner can adjust schedule visibility" });
       }
 
-      const updatedGroup = await storage.updateGroup(req.params.id, { scheduleVisibility }, userId);
+      const updatedGroup = await storage.updateGroup(req.params.id, { scheduleVisibility: normalizedScheduleVisibility }, userId);
       if (!updatedGroup) {
         return res.status(404).json({ error: "Group not found" });
       }
@@ -1020,9 +1025,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/groups/:id/recipient-visibility", authMiddleware, async (req: any, res) => {
     try {
       const userId = getUserId(req);
-      const { recipientVisibility } = req.body;
-
-      if (recipientVisibility !== 0 && recipientVisibility !== 1) {
+      const normalizedRecipientVisibility = normalizeBoolean(req.body.recipientVisibility);
+      if (normalizedRecipientVisibility === null) {
         return res.status(400).json({ error: "Recipient visibility must be 0 or 1" });
       }
 
@@ -1040,7 +1044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Cannot adjust recipient visibility for completed groups" });
       }
 
-      const updatedGroup = await storage.updateGroup(req.params.id, { recipientVisibility }, userId);
+      const updatedGroup = await storage.updateGroup(req.params.id, { recipientVisibility: normalizedRecipientVisibility }, userId);
       if (!updatedGroup) {
         return res.status(404).json({ error: "Group not found" });
       }
@@ -1168,24 +1172,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Members endpoints - All require authentication and group ownership verification
+  // Members endpoints - Require authentication and group membership verification
+  // Updated to respect scheduleVisibility setting for non-admin members
   app.get("/api/groups/:groupId/members", authMiddleware, async (req: any, res) => {
     try {
       const userId = getUserId(req);
+      const groupId = req.params.groupId;
+      
       // Get the group
-      const group = await storage.getGroup(req.params.groupId);
+      const group = await storage.getGroup(groupId);
       if (!group) {
         return res.status(404).json({ error: "Group not found" });
       }
       
-      // CRITICAL: Verify the authenticated user is the actual group owner (creator-only endpoint)
-      if (group.userId !== userId) {
-        return res.status(403).json({ error: "Only the group creator can view detailed member information" });
+      // First check: Is user a member of this group?
+      const membership = await storage.getMemberByUserAndGroup(userId, groupId);
+      if (!membership) {
+        return res.status(403).json({ error: "You are not a member of this group" });
       }
       
-      const members = await storage.getMembersByGroup(req.params.groupId);
+      // Second check: Can this user see the member list/schedule?
+      // Admins can always see, others need scheduleVisibility = 1
+      const isAdmin = group.userId === userId || membership.isAdmin === 1 || membership.role === 'creator';
+      const normalizedScheduleVisibility = Number(group.scheduleVisibility ?? 1);
+      const canViewSchedule = isAdmin || normalizedScheduleVisibility === 1;
+      
+      if (!canViewSchedule) {
+        return res.status(403).json({ error: "Schedule is hidden for this group" });
+      }
+      
+      const members = await storage.getMembersByGroup(groupId);
       res.json(members);
     } catch (error) {
+      console.error("[GET /groups/:groupId/members] Error:", error);
       res.status(500).json({ error: "Failed to fetch members" });
     }
   });
@@ -1195,11 +1214,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = getUserId(req);
       const { groupId, memberId } = req.params;
-      const { canPostInGroup } = req.body;
-      
-      if (typeof canPostInGroup !== 'boolean') {
-        return res.status(400).json({ error: "canPostInGroup must be a boolean" });
+      const normalizedCanPostInGroup = normalizeBoolean(req.body.canPostInGroup);
+      if (normalizedCanPostInGroup === null) {
+        return res.status(400).json({ error: "canPostInGroup must be 0 or 1" });
       }
+      const canPostInGroup = normalizedCanPostInGroup === 1;
       
       // Get the group
       const group = await storage.getGroup(groupId);
@@ -1239,11 +1258,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = getUserId(req);
       const { groupId, memberId } = req.params;
-      const { isAdmin } = req.body;
-      
-      if (typeof isAdmin !== 'boolean') {
-        return res.status(400).json({ error: "isAdmin must be a boolean" });
+      const normalizedIsAdmin = normalizeBoolean(req.body.isAdmin);
+      if (normalizedIsAdmin === null) {
+        return res.status(400).json({ error: "isAdmin must be 0 or 1" });
       }
+      const isAdmin = normalizedIsAdmin === 1;
       
       // Get the group
       const group = await storage.getGroup(groupId);
@@ -1551,12 +1570,12 @@ app.get("/api/groups/:groupId/contributions", authMiddleware, async (req: any, r
 // ============================================================================
 
 // GET /api/groups/:groupId/cycle-status - Debug endpoint to check cycle advancement status
-// TODO: Add auth back after debugging (was: authMiddleware)
-app.get("/api/groups/:groupId/cycle-status", async (req: any, res) => {
+app.get("/api/groups/:groupId/cycle-status", authMiddleware, async (req: any, res) => {
   try {
+    const userId = getUserId(req);
     const { groupId } = req.params;
     
-    console.log(`[GET /cycle-status] Group: ${groupId} (PUBLIC - no auth)`);
+    console.log(`[GET /cycle-status] Group: ${groupId}`);
     
     // Get the group
     const group = await storage.getGroup(groupId);
@@ -1564,11 +1583,10 @@ app.get("/api/groups/:groupId/cycle-status", async (req: any, res) => {
       return res.status(404).json({ error: "Group not found" });
     }
     
-    // TODO: Add auth back after debugging - member verification disabled
-    // const member = await storage.getMemberByUserAndGroup(userId, groupId);
-    // if (!member) {
-    //   return res.status(403).json({ error: "You must be a member of this group" });
-    // }
+    const member = await storage.getMemberByUserAndGroup(userId, groupId);
+    if (!member && group.userId !== userId) {
+      return res.status(403).json({ error: "You must be a member of this group" });
+    }
     
     // Get all members
     const members = await storage.getMembersByGroup(groupId);
@@ -1674,13 +1692,13 @@ app.get("/api/groups/:groupId/cycle-status", async (req: any, res) => {
 });
 
 // POST /api/groups/:groupId/advance-cycle - Manual cycle advancement (admin only)
-// TODO: Add auth back after debugging (was: authMiddleware)
-app.post("/api/groups/:groupId/advance-cycle", async (req: any, res) => {
+app.post("/api/groups/:groupId/advance-cycle", authMiddleware, async (req: any, res) => {
   try {
+    const userId = getUserId(req);
     const { groupId } = req.params;
     const { force } = req.body; // Optional: force advance even with missing contributions
     
-    console.log(`[POST /advance-cycle] Group: ${groupId}, Force: ${force} (PUBLIC - no auth)`);
+    console.log(`[POST /advance-cycle] Group: ${groupId}, Force: ${force}`);
     
     // Get the group
     const group = await storage.getGroup(groupId);
@@ -1688,14 +1706,13 @@ app.post("/api/groups/:groupId/advance-cycle", async (req: any, res) => {
       return res.status(404).json({ error: "Group not found" });
     }
     
-    // TODO: Add auth back after debugging - admin verification disabled
-    // const member = await storage.getMemberByUserAndGroup(userId, groupId);
-    // const isOwner = group.userId === userId;
-    // const isCoAdmin = member?.isAdmin === 1;
-    // const isCreator = member?.role === 'creator';
-    // if (!isOwner && !isCoAdmin && !isCreator) {
-    //   return res.status(403).json({ error: "Only group owner or admins can advance the cycle" });
-    // }
+    const member = await storage.getMemberByUserAndGroup(userId, groupId);
+    const isOwner = group.userId === userId;
+    const isCoAdmin = member?.isAdmin === 1;
+    const isCreator = member?.role === 'creator';
+    if (!isOwner && !isCoAdmin && !isCreator) {
+      return res.status(403).json({ error: "Only group owner or admins can advance the cycle" });
+    }
     
     // Check group status
     if (group.status !== 'active') {
@@ -3359,8 +3376,8 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
   // Affiliate Partner Routes
   // ============================================================================
 
-  // Public: Get all partners (optionally filter by active)
-  app.get('/api/partners', async (req, res) => {
+  // Get all partners (optionally filter by active)
+  app.get('/api/partners', authMiddleware, async (req, res) => {
     try {
       const activeOnly = req.query.activeOnly === 'true';
       const partners = await storage.getPartners(activeOnly);
@@ -3371,8 +3388,8 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
     }
   });
 
-  // Public: Get single partner
-  app.get('/api/partners/:id', async (req, res) => {
+  // Get single partner
+  app.get('/api/partners/:id', authMiddleware, async (req, res) => {
     try {
       const partner = await storage.getPartner(req.params.id);
       if (!partner) {
@@ -3538,8 +3555,8 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
     }
   });
 
-  // Public: Track partner click (authentication optional)
-  app.post('/api/partners/:id/click', async (req: any, res) => {
+  // Track partner click
+  app.post('/api/partners/:id/click', authMiddleware, async (req: any, res) => {
     try {
       const partnerId = req.params.id;
       
@@ -3549,19 +3566,7 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
         return res.status(404).json({ error: "Partner not found" });
       }
 
-      // Get userId from Clerk if authenticated, otherwise null
-      let userId: string | null = null;
-      try {
-        const auth = getAuth(req);
-        if (auth.userId) {
-          const user = await storage.getUserByClerkId(auth.userId);
-          if (user) {
-            userId = user.id;
-          }
-        }
-      } catch {
-        // Not authenticated - proceed with anonymous click tracking
-      }
+      const userId = getUserId(req);
 
       const click = await storage.trackPartnerClick(partnerId, userId);
       res.json({ success: true, clickId: click.id });
@@ -3676,6 +3681,36 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
   app.patch('/api/settings', authMiddleware, async (req: any, res) => {
     try {
       const userId = getUserId(req);
+
+      if (req.body.inactivityTimeoutEnabled !== undefined) {
+        const normalized = normalizeBoolean(req.body.inactivityTimeoutEnabled);
+        if (normalized === null) {
+          return res.status(400).json({ error: "inactivityTimeoutEnabled must be 0 or 1" });
+        }
+        req.body.inactivityTimeoutEnabled = normalized === 1;
+      }
+      if (req.body.biometricEnabled !== undefined) {
+        const normalized = normalizeBoolean(req.body.biometricEnabled);
+        if (normalized === null) {
+          return res.status(400).json({ error: "biometricEnabled must be 0 or 1" });
+        }
+        req.body.biometricEnabled = normalized === 1;
+      }
+      if (req.body.pushNotificationsEnabled !== undefined) {
+        const normalized = normalizeBoolean(req.body.pushNotificationsEnabled);
+        if (normalized === null) {
+          return res.status(400).json({ error: "pushNotificationsEnabled must be 0 or 1" });
+        }
+        req.body.pushNotificationsEnabled = normalized === 1;
+      }
+      if (req.body.emailNotificationsEnabled !== undefined) {
+        const normalized = normalizeBoolean(req.body.emailNotificationsEnabled);
+        if (normalized === null) {
+          return res.status(400).json({ error: "emailNotificationsEnabled must be 0 or 1" });
+        }
+        req.body.emailNotificationsEnabled = normalized === 1;
+      }
+
       const updates = schema.updateUserSettingsSchema.parse(req.body);
       
       const settings = await storage.updateUserSettings(userId, updates);

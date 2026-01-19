@@ -12,6 +12,8 @@ import { safeAlert } from "@/utils/alertGate";
 
 export default function BiometricSetupScreen() {
   const [biometricType, setBiometricType] = useState<"face" | "fingerprint" | null>(null);
+  const [hasBiometricHardware, setHasBiometricHardware] = useState(true);
+  const [isEnrolled, setIsEnrolled] = useState(false);
   const [loading, setLoading] = useState(false);
   const isMountedRef = useRef(true);
 
@@ -39,19 +41,27 @@ export default function BiometricSetupScreen() {
   const checkBiometrics = async () => {
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
       
-      if (hasHardware && isEnrolled && isMountedRef.current) {
-        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-          setBiometricType("face");
-        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-          setBiometricType("fingerprint");
+      if (isMountedRef.current) {
+        setHasBiometricHardware(hasHardware);
+        setIsEnrolled(enrolled);
+        
+        if (hasHardware && enrolled) {
+          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+            setBiometricType("face");
+          } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+            setBiometricType("fingerprint");
+          }
         }
       }
     } catch (error) {
       if (__DEV__) {
         console.log("Error checking biometrics:", error);
+      }
+      if (isMountedRef.current) {
+        setHasBiometricHardware(false);
       }
     }
   };
@@ -74,6 +84,7 @@ export default function BiometricSetupScreen() {
         if (result.success) {
           // Save biometric preference securely
           await secureStorage.setBiometricEnabled(true);
+          await secureStorage.setBiometricSetupComplete(true);
           await secureStorage.updateLastAuthTime();
           
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -81,9 +92,14 @@ export default function BiometricSetupScreen() {
         } else {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           if (result.error === "user_cancel") {
-            // User cancelled, don't show error
+            // User cancelled - prompt them that it's required
+            safeAlert(
+              "Security Required",
+              "Biometric authentication is required to secure your savings. Please try again.",
+              [{ text: "OK" }]
+            );
           } else if (result.error) {
-            safeAlert("Authentication Failed", "Please try again.");
+            safeAlert("Authentication Failed", "Please try again to enable biometric security.");
           }
         }
       } catch (error) {
@@ -91,7 +107,7 @@ export default function BiometricSetupScreen() {
           console.log("Biometric error:", error);
         }
         if (isMountedRef.current) {
-          safeAlert("Error", "Failed to enable biometric authentication.");
+          safeAlert("Error", "Failed to enable biometric authentication. Please try again.");
         }
       } finally {
         if (isMountedRef.current) {
@@ -99,6 +115,11 @@ export default function BiometricSetupScreen() {
         }
       }
     });
+  };
+
+  const handleSetupPIN = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.replace("/(auth)/pin-setup");
   };
 
   const handleComplete = () => {
@@ -112,11 +133,21 @@ export default function BiometricSetupScreen() {
     router.replace("/(app)/(tabs)" as any);
   };
 
-  const handleSkip = async () => {
+  // Handle devices without biometric support - must set up PIN
+  const handleNoBiometricDevice = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Explicitly disable biometrics when skipped
-    await secureStorage.setBiometricEnabled(false);
-    handleComplete();
+    safeAlert(
+      "PIN Required",
+      "Your device doesn't support biometric authentication. You'll need to set up a PIN to secure your account.",
+      [
+        {
+          text: "Set Up PIN",
+          onPress: () => {
+            router.replace("/(auth)/pin-setup");
+          },
+        },
+      ]
+    );
   };
 
   const getBiometricIcon = (): keyof typeof Ionicons.glyphMap => {
@@ -133,22 +164,124 @@ export default function BiometricSetupScreen() {
     return Platform.OS === "ios" ? "Touch ID" : "Fingerprint";
   };
 
+  // Device doesn't support biometrics
+  if (!hasBiometricHardware || !isEnrolled) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 16 }}>
+          
+          {/* Content */}
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 32 }}>
+            
+            {/* Icon */}
+            <View style={{
+              width: 120,
+              height: 120,
+              borderRadius: 60,
+              backgroundColor: colors.warning.muted,
+              alignItems: "center",
+              justifyContent: "center",
+            }}>
+              <Ionicons 
+                name="lock-closed" 
+                size={60} 
+                color={colors.warning.DEFAULT} 
+              />
+            </View>
+
+            {/* Text */}
+            <View style={{ alignItems: "center", gap: 12 }}>
+              <Text style={{ 
+                color: colors.text, 
+                fontSize: 28, 
+                fontWeight: "700",
+                textAlign: "center",
+              }}>
+                Secure Your Account
+              </Text>
+              <Text style={{ 
+                color: colors.textMuted, 
+                fontSize: 16, 
+                textAlign: "center",
+                lineHeight: 24,
+                paddingHorizontal: 20,
+              }}>
+                {!hasBiometricHardware 
+                  ? "Your device doesn't support biometric authentication. You'll need to set up a PIN to protect your savings."
+                  : "Biometrics are not set up on your device. Please enable them in Settings, or set up a PIN."
+                }
+              </Text>
+            </View>
+
+            {/* Security Info */}
+            <View style={{ 
+              backgroundColor: colors.card,
+              padding: 16,
+              borderRadius: 14,
+              width: "100%",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}>
+              <Ionicons name="shield-checkmark" size={24} color={colors.primary.DEFAULT} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
+                  Security Required
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                  KudiLoop handles real money. Account security is mandatory.
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Button */}
+          <View style={{ gap: 12 }}>
+            <Button onPress={handleSetupPIN}>
+              Set Up PIN
+            </Button>
+            
+            {!isEnrolled && hasBiometricHardware && (
+              <Button 
+                variant="ghost" 
+                onPress={() => {
+                  safeAlert(
+                    "Enable Biometrics",
+                    "Go to your device Settings > Security to enable Face ID or Fingerprint, then return to KudiLoop.",
+                    [{ text: "OK" }]
+                  );
+                }}
+              >
+                I'll Enable Biometrics in Settings
+              </Button>
+            )}
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Device supports biometrics - show setup screen
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 16 }}>
         
-        {/* Skip Button */}
-        <View style={{ alignItems: "flex-end" }}>
-          <Pressable
-            onPress={handleSkip}
-            style={({ pressed }) => ({
-              paddingVertical: 8,
-              paddingHorizontal: 16,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Text style={{ color: colors.textMuted, fontSize: 16 }}>Skip</Text>
-          </Pressable>
+        {/* Security Badge - No skip option */}
+        <View style={{ 
+          alignItems: "center",
+          backgroundColor: colors.primary.DEFAULT + "15",
+          paddingVertical: 8,
+          paddingHorizontal: 16,
+          borderRadius: 20,
+          alignSelf: "center",
+          marginBottom: 16,
+        }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Ionicons name="shield-checkmark" size={16} color={colors.primary.DEFAULT} />
+            <Text style={{ color: colors.primary.DEFAULT, fontSize: 13, fontWeight: "600" }}>
+              Required for Security
+            </Text>
+          </View>
         </View>
 
         {/* Content */}
@@ -178,10 +311,7 @@ export default function BiometricSetupScreen() {
               fontWeight: "700",
               textAlign: "center",
             }}>
-              {biometricType 
-                ? `Enable ${getBiometricName()}`
-                : "Quick Access"
-              }
+              Secure Your Savings
             </Text>
             <Text style={{ 
               color: colors.textMuted, 
@@ -190,51 +320,38 @@ export default function BiometricSetupScreen() {
               lineHeight: 24,
               paddingHorizontal: 20,
             }}>
-              {biometricType 
-                ? `Use ${getBiometricName()} for quick and secure access to your account`
-                : "Your device doesn't support biometric authentication"
-              }
+              KudiLoop requires {getBiometricName()} to protect your account. This keeps your savings secure even if someone has your phone.
             </Text>
           </View>
 
           {/* Features */}
-          {biometricType && (
-            <View style={{ gap: 16, width: "100%" }}>
-              <FeatureItem 
-                icon="flash" 
-                title="Instant Access" 
-                description="Sign in with a glance or touch"
-              />
-              <FeatureItem 
-                icon="shield-checkmark" 
-                title="Secure" 
-                description="Your biometrics never leave your device"
-              />
-              <FeatureItem 
-                icon="lock-closed" 
-                title="PIN Backup" 
-                description="Use your PIN if biometrics fail"
-              />
-            </View>
-          )}
+          <View style={{ gap: 16, width: "100%" }}>
+            <FeatureItem 
+              icon="flash" 
+              title="Instant Access" 
+              description="Sign in with a glance or touch"
+            />
+            <FeatureItem 
+              icon="shield-checkmark" 
+              title="Bank-Level Security" 
+              description="Your biometrics never leave your device"
+            />
+            <FeatureItem 
+              icon="time" 
+              title="Auto-Lock Protection" 
+              description="App locks after 2 minutes of inactivity"
+            />
+          </View>
         </View>
 
-        {/* Buttons */}
+        {/* Buttons - No skip option */}
         <View style={{ gap: 12 }}>
-          {biometricType ? (
-            <>
-              <Button onPress={handleEnableBiometrics} loading={loading}>
-                {`Enable ${getBiometricName()}`}
-              </Button>
-              <Button variant="ghost" onPress={handleSkip}>
-                Maybe Later
-              </Button>
-            </>
-          ) : (
-            <Button onPress={handleComplete}>
-              Continue
-            </Button>
-          )}
+          <Button onPress={handleEnableBiometrics} loading={loading}>
+            {`Enable ${getBiometricName()}`}
+          </Button>
+          <Button variant="ghost" onPress={handleSetupPIN}>
+            Use PIN Instead
+          </Button>
         </View>
       </View>
     </SafeAreaView>
@@ -280,4 +397,3 @@ function FeatureItem({
     </View>
   );
 }
-

@@ -18,10 +18,15 @@ const KEYS = {
   PIN_HASH: 'kudiloop_pin_hash',
   PIN_SALT: 'kudiloop_pin_salt',
   BIOMETRIC_ENABLED: 'kudiloop_biometric_enabled',
+  BIOMETRIC_SETUP_COMPLETE: 'kudiloop_biometric_setup_complete',
   LAST_AUTH_TIME: 'kudiloop_last_auth_time',
   DEVICE_ID: 'kudiloop_device_id',
   PIN_ATTEMPTS: 'kudiloop_pin_attempts',
   PIN_LOCKOUT_UNTIL: 'kudiloop_pin_lockout',
+  APP_BACKGROUND_TIME: 'kudiloop_app_background_time',
+  APP_LOCKED: 'kudiloop_app_locked',
+  BIOMETRIC_FAILED_ATTEMPTS: 'kudiloop_biometric_failed_attempts',
+  INACTIVITY_TIMEOUT_MINUTES: 'kudiloop_inactivity_timeout_minutes',
 } as const;
 
 // Options for maximum security
@@ -370,6 +375,142 @@ export const secureStorage = {
       failedAttempts,
       isLockedOut: lockoutStatus.locked,
     };
+  },
+
+  // ============================================
+  // App Lock State Management (for biometric unlock)
+  // ============================================
+
+  /**
+   * Set the app background timestamp (when app goes to background)
+   */
+  async setAppBackgroundTime(): Promise<void> {
+    await this.set(KEYS.APP_BACKGROUND_TIME, Date.now().toString());
+  },
+
+  /**
+   * Get the app background timestamp
+   */
+  async getAppBackgroundTime(): Promise<number | null> {
+    const value = await this.get(KEYS.APP_BACKGROUND_TIME);
+    return value ? parseInt(value, 10) : null;
+  },
+
+  /**
+   * Clear the app background timestamp
+   */
+  async clearAppBackgroundTime(): Promise<void> {
+    await this.delete(KEYS.APP_BACKGROUND_TIME);
+  },
+
+  /**
+   * Set app locked state
+   */
+  async setAppLocked(locked: boolean): Promise<void> {
+    if (locked) {
+      await this.set(KEYS.APP_LOCKED, 'true');
+    } else {
+      await this.delete(KEYS.APP_LOCKED);
+    }
+  },
+
+  /**
+   * Check if app is locked
+   */
+  async isAppLocked(): Promise<boolean> {
+    const value = await this.get(KEYS.APP_LOCKED);
+    return value === 'true';
+  },
+
+  // ============================================
+  // Biometric Setup Complete Flag
+  // ============================================
+
+  /**
+   * Mark biometric/PIN setup as complete (user has gone through setup flow)
+   */
+  async setBiometricSetupComplete(complete: boolean): Promise<void> {
+    if (complete) {
+      await this.set(KEYS.BIOMETRIC_SETUP_COMPLETE, 'true');
+    } else {
+      await this.delete(KEYS.BIOMETRIC_SETUP_COMPLETE);
+    }
+    if (__DEV__) {
+      console.log(`🔐 Biometric setup ${complete ? 'complete' : 'incomplete'}`);
+    }
+  },
+
+  /**
+   * Check if biometric/PIN setup is complete
+   */
+  async isBiometricSetupComplete(): Promise<boolean> {
+    const value = await this.get(KEYS.BIOMETRIC_SETUP_COMPLETE);
+    return value === 'true';
+  },
+
+  // ============================================
+  // Biometric Failed Attempts (separate from PIN)
+  // ============================================
+
+  /**
+   * Record a failed biometric attempt
+   * Returns the number of attempts made
+   */
+  async recordBiometricFailedAttempt(): Promise<number> {
+    const current = await this.get(KEYS.BIOMETRIC_FAILED_ATTEMPTS);
+    const attempts = (current ? parseInt(current, 10) : 0) + 1;
+    await this.set(KEYS.BIOMETRIC_FAILED_ATTEMPTS, attempts.toString());
+    if (__DEV__) {
+      console.log(`🔐 Biometric failed attempts: ${attempts}`);
+    }
+    return attempts;
+  },
+
+  /**
+   * Get biometric failed attempts count
+   */
+  async getBiometricFailedAttempts(): Promise<number> {
+    const value = await this.get(KEYS.BIOMETRIC_FAILED_ATTEMPTS);
+    return value ? parseInt(value, 10) : 0;
+  },
+
+  /**
+   * Reset biometric failed attempts (on successful auth)
+   */
+  async resetBiometricFailedAttempts(): Promise<void> {
+    await this.delete(KEYS.BIOMETRIC_FAILED_ATTEMPTS);
+  },
+
+  // ============================================
+  // Inactivity Timeout Settings
+  // ============================================
+
+  /**
+   * Set the inactivity timeout in minutes
+   * @param minutes Timeout value (1, 2, 5, 10, 15)
+   */
+  async setInactivityTimeout(minutes: number): Promise<void> {
+    await this.set(KEYS.INACTIVITY_TIMEOUT_MINUTES, minutes.toString());
+    if (__DEV__) {
+      console.log(`🔐 Inactivity timeout set to ${minutes} minutes`);
+    }
+  },
+
+  /**
+   * Get the inactivity timeout in minutes
+   * @returns Timeout in minutes, defaults to 2 if not set
+   */
+  async getInactivityTimeout(): Promise<number> {
+    const value = await this.get(KEYS.INACTIVITY_TIMEOUT_MINUTES);
+    return value ? parseInt(value, 10) : 2; // Default to 2 minutes
+  },
+
+  /**
+   * Get inactivity timeout in milliseconds
+   */
+  async getInactivityTimeoutMs(): Promise<number> {
+    const minutes = await this.getInactivityTimeout();
+    return minutes * 60 * 1000;
   },
 };
 

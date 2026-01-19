@@ -1,13 +1,12 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { AppState, AppStateStatus, PanResponder } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { secureStorage } from '@/services/secureStorage';
-import { config } from '@/config/env';
-import { useUserSettings } from '@/hooks/api/useUser';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Default timeout values in minutes
-const DEFAULT_TIMEOUT_MINUTES = 5;
-const TIMEOUT_OPTIONS = [1, 3, 5, 10, 15] as const;
+// Default timeout is 2 minutes (fintech security requirement)
+const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+const TIMEOUT_OPTIONS = [1, 2, 5, 10, 15] as const;
 
 export type TimeoutOption = typeof TIMEOUT_OPTIONS[number];
 
@@ -21,53 +20,95 @@ function minutesToMs(minutes: number): number {
 /**
  * Hook to handle session timeout based on user inactivity
  * 
- * Features:
- * - Reads timeout duration from user settings (server-synced)
- * - Tracks user activity (touches, navigation)
- * - Triggers PIN/biometric re-auth when timeout expires
- * - Pauses during background, resumes on foreground
- * - Does NOT sign out - just requires local re-authentication
+ * Security Features:
+ * - 2-minute default timeout (configurable: 1, 2, 5, 10, 15 minutes)
+ * - Tracks app background time - if returns within timeout, show biometric unlock
+ * - Tracks foreground inactivity - after timeout, show biometric unlock
+ * - Full sign out after extended timeout (2x the normal timeout)
  * 
  * @param options Configuration options
  * @param options.enabled Whether session timeout is enabled (default: true)
- * @param options.onTimeout Callback when session times out
- * 
- * @example
- * ```tsx
- * // In your authenticated layout
- * const { registerActivity } = useSessionTimeout({
- *   onTimeout: () => {
- *     console.log('Session timed out');
- *   }
- * });
- * 
- * // Call registerActivity on user interactions if needed
- * ```
+ * @param options.onLock Callback when app is locked (shows biometric unlock)
+ * @param options.onTimeout Callback when session times out (full sign out)
  */
 export function useSessionTimeout(options?: {
   enabled?: boolean;
+  onLock?: () => void;
   onTimeout?: () => void;
 }) {
   const {
     enabled = true,
+    onLock,
     onTimeout,
   } = options || {};
 
   const router = useRouter();
   const pathname = usePathname();
+  const { signOut } = useAuth();
+  
   const appState = useRef(AppState.currentState);
   const backgroundTime = useRef<number | null>(null);
   const lastActivityTime = useRef<number>(Date.now());
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
-  const [isTimedOut, setIsTimedOut] = useState(false);
-  
-  // Get timeout settings from server
-  const { data: userSettings } = useUserSettings();
-  
-  // Determine the timeout in milliseconds
-  const timeoutMs = userSettings?.inactivityTimeoutEnabled
-    ? minutesToMs(userSettings.inactivityTimeoutMinutes || DEFAULT_TIMEOUT_MINUTES)
-    : config.sessionTimeoutMs; // Fallback to config default
+  const [isLocked, setIsLocked] = useState(false);
+  const [timeoutMs, setTimeoutMs] = useState(DEFAULT_TIMEOUT_MS);
+
+  // Load timeout setting from secure storage
+  useEffect(() => {
+    const loadTimeout = async () => {
+      const minutes = await secureStorage.getInactivityTimeout();
+      setTimeoutMs(minutesToMs(minutes));
+    };
+    loadTimeout();
+  }, []);
+
+  /**
+   * Lock the app (show biometric unlock)
+   */
+  const lockApp = useCallback(async (reason: 'background_timeout' | 'inactivity') => {
+    // Don't lock if already on auth screens
+    if (pathname?.startsWith('/(auth)')) {
+      return;
+    }
+
+    const hasPin = await secureStorage.hasPinSet();
+    const hasBiometric = await secureStorage.isBiometricEnabled();
+    
+    if (!hasPin && !hasBiometric) {
+      // No security set up - don't lock
+      return;
+    }
+
+    if (__DEV__) {
+      console.log(`🔐 Locking app - reason: ${reason}`);
+    }
+    
+    setIsLocked(true);
+    await secureStorage.setAppLocked(true);
+    onLock?.();
+    
+    // Navigate to biometric unlock screen
+    router.replace({
+      pathname: '/(auth)/biometric-unlock',
+      params: { reason },
+    } as any);
+  }, [pathname, router, onLock]);
+
+  /**
+   * Force sign out (after extended timeout or too many failed attempts)
+   */
+  const forceSignOut = useCallback(async () => {
+    if (__DEV__) {
+      console.log('🔐 Force sign out due to extended timeout');
+    }
+    
+    await secureStorage.clearAll();
+    await secureStorage.setAppLocked(false);
+    onTimeout?.();
+    await signOut();
+    
+    router.replace('/(auth)/welcome');
+  }, [router, signOut, onTimeout]);
 
   /**
    * Register user activity to reset the inactivity timer
@@ -80,37 +121,12 @@ export function useSessionTimeout(options?: {
       clearTimeout(inactivityTimer.current);
     }
     
-    if (enabled && appState.current === 'active') {
+    if (enabled && appState.current === 'active' && !isLocked) {
       inactivityTimer.current = setTimeout(async () => {
-        await handleInactivityTimeout();
+        await lockApp('inactivity');
       }, timeoutMs);
     }
-  }, [enabled, timeoutMs]);
-
-  /**
-   * Handle inactivity timeout
-   */
-  const handleInactivityTimeout = useCallback(async () => {
-    // Don't trigger if already on auth screens
-    if (pathname?.startsWith('/(auth)')) {
-      return;
-    }
-    
-    const hasPin = await secureStorage.hasPinSet();
-    const hasBiometric = await secureStorage.isBiometricEnabled();
-    
-    if (hasPin || hasBiometric) {
-      if (__DEV__) {
-        console.log('🔐 Inactivity timeout - requiring re-auth');
-      }
-      
-      setIsTimedOut(true);
-      onTimeout?.();
-      
-      // Navigate to PIN entry screen
-      router.replace('/(auth)/pin-entry');
-    }
-  }, [pathname, router, onTimeout]);
+  }, [enabled, timeoutMs, isLocked, lockApp]);
 
   /**
    * Handle app state changes (foreground/background)
@@ -121,6 +137,7 @@ export function useSessionTimeout(options?: {
     // App going to background
     if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
       backgroundTime.current = Date.now();
+      await secureStorage.setAppBackgroundTime();
       
       // Clear the inactivity timer when backgrounded
       if (inactivityTimer.current) {
@@ -137,42 +154,40 @@ export function useSessionTimeout(options?: {
 
     // App coming to foreground
     if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-      if (backgroundTime.current) {
-        const elapsed = Date.now() - backgroundTime.current;
+      const bgTime = await secureStorage.getAppBackgroundTime();
+      
+      if (bgTime) {
+        const elapsed = Date.now() - bgTime;
         
         if (__DEV__) {
-          console.log(`🔐 App foregrounded after ${Math.round(elapsed / 1000)}s`);
+          console.log(`🔐 App foregrounded after ${Math.round(elapsed / 1000)}s (timeout: ${timeoutMs / 1000}s)`);
         }
         
-        // If session timed out while backgrounded, require re-authentication
-        if (elapsed > timeoutMs) {
-          // Don't trigger if already on auth screens
+        // Check if we should force sign out (2x the normal timeout)
+        const extendedTimeout = timeoutMs * 2;
+        
+        if (elapsed > extendedTimeout) {
+          // Extended timeout - force sign out
+          await forceSignOut();
+        } else if (elapsed > timeoutMs) {
+          // Normal timeout - show biometric unlock
           if (!pathname?.startsWith('/(auth)')) {
-            const hasPin = await secureStorage.hasPinSet();
-            const hasBiometric = await secureStorage.isBiometricEnabled();
-            
-            if (hasPin || hasBiometric) {
-              if (__DEV__) {
-                console.log('🔐 Session timed out while backgrounded, requiring re-auth');
-              }
-              
-              setIsTimedOut(true);
-              onTimeout?.();
-              
-              // Navigate to PIN entry screen
-              router.replace('/(auth)/pin-entry');
-            }
+            await lockApp('background_timeout');
           }
         } else {
-          // Reset activity timer since we're back
+          // Within timeout - just restart activity timer
           registerActivity();
         }
+        
+        // Clear background time
+        await secureStorage.clearAppBackgroundTime();
       }
+      
       backgroundTime.current = null;
     }
 
     appState.current = nextAppState;
-  }, [enabled, timeoutMs, pathname, router, onTimeout, registerActivity]);
+  }, [enabled, timeoutMs, pathname, lockApp, forceSignOut, registerActivity]);
 
   // Set up app state listener
   useEffect(() => {
@@ -180,11 +195,18 @@ export function useSessionTimeout(options?: {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     
-    // Update auth time on mount
-    secureStorage.updateLastAuthTime();
+    // Check if app was locked before
+    const checkLockedState = async () => {
+      const wasLocked = await secureStorage.isAppLocked();
+      if (wasLocked && !pathname?.startsWith('/(auth)')) {
+        await lockApp('background_timeout');
+      } else {
+        // Start the inactivity timer
+        registerActivity();
+      }
+    };
     
-    // Start the inactivity timer
-    registerActivity();
+    checkLockedState();
     
     return () => {
       subscription.remove();
@@ -192,14 +214,14 @@ export function useSessionTimeout(options?: {
         clearTimeout(inactivityTimer.current);
       }
     };
-  }, [enabled, handleAppStateChange, registerActivity]);
+  }, [enabled, handleAppStateChange, registerActivity, lockApp, pathname]);
 
   // Reset activity on navigation changes
   useEffect(() => {
-    if (enabled && !pathname?.startsWith('/(auth)')) {
+    if (enabled && !pathname?.startsWith('/(auth)') && !isLocked) {
       registerActivity();
     }
-  }, [pathname, enabled, registerActivity]);
+  }, [pathname, enabled, isLocked, registerActivity]);
 
   /**
    * Manually reset the session timeout
@@ -207,12 +229,30 @@ export function useSessionTimeout(options?: {
    */
   const resetTimeout = useCallback(async () => {
     backgroundTime.current = null;
-    setIsTimedOut(false);
+    setIsLocked(false);
+    await secureStorage.setAppLocked(false);
+    await secureStorage.clearAppBackgroundTime();
     await secureStorage.updateLastAuthTime();
     registerActivity();
     
     if (__DEV__) {
       console.log('🔐 Session timeout reset');
+    }
+  }, [registerActivity]);
+
+  /**
+   * Unlock the app (call after successful biometric/PIN auth)
+   */
+  const unlockApp = useCallback(async () => {
+    setIsLocked(false);
+    await secureStorage.setAppLocked(false);
+    await secureStorage.clearAppBackgroundTime();
+    await secureStorage.updateLastAuthTime();
+    await secureStorage.resetBiometricFailedAttempts();
+    registerActivity();
+    
+    if (__DEV__) {
+      console.log('🔐 App unlocked');
     }
   }, [registerActivity]);
 
@@ -223,11 +263,26 @@ export function useSessionTimeout(options?: {
     return secureStorage.hasSessionTimedOut(timeoutMs);
   }, [timeoutMs]);
 
+  /**
+   * Update the timeout setting
+   */
+  const setTimeoutMinutes = useCallback(async (minutes: TimeoutOption) => {
+    await secureStorage.setInactivityTimeout(minutes);
+    setTimeoutMs(minutesToMs(minutes));
+    registerActivity(); // Restart timer with new value
+    
+    if (__DEV__) {
+      console.log(`🔐 Timeout updated to ${minutes} minutes`);
+    }
+  }, [registerActivity]);
+
   return {
     registerActivity,
     resetTimeout,
+    unlockApp,
     checkTimeout,
-    isTimedOut,
+    setTimeoutMinutes,
+    isLocked,
     timeoutMs,
   };
 }

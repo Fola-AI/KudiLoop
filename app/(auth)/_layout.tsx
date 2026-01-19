@@ -1,12 +1,35 @@
-import { Stack, Redirect } from 'expo-router';
+import { Stack, Redirect, usePathname } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
+import { useState, useEffect } from 'react';
 import { colors } from '@/theme';
+import { secureStorage } from '@/services/secureStorage';
 
 export default function AuthLayout() {
   const { isSignedIn, isLoaded } = useAuth();
+  const pathname = usePathname();
+  const [isAppLocked, setIsAppLocked] = useState<boolean | null>(null);
+  const [isCheckingLock, setIsCheckingLock] = useState(true);
   
-  if (!isLoaded) {
+  // Check if app is locked
+  useEffect(() => {
+    const checkLockState = async () => {
+      try {
+        const locked = await secureStorage.isAppLocked();
+        setIsAppLocked(locked);
+      } catch (error) {
+        setIsAppLocked(false);
+      } finally {
+        setIsCheckingLock(false);
+      }
+    };
+    
+    if (isLoaded) {
+      checkLockState();
+    }
+  }, [isLoaded, pathname]);
+  
+  if (!isLoaded || isCheckingLock) {
     return (
       <View style={{ 
         flex: 1, 
@@ -19,8 +42,14 @@ export default function AuthLayout() {
     );
   }
   
-  // Already signed in? Go to main app
-  if (isSignedIn) {
+  // If signed in but NOT locked, redirect to main app
+  // (Unless we're on biometric-unlock, pin-entry, biometric-setup, or pin-setup screens)
+  const isSecurityScreen = pathname?.includes('biometric-unlock') || 
+                           pathname?.includes('pin-entry') || 
+                           pathname?.includes('biometric-setup') ||
+                           pathname?.includes('pin-setup');
+  
+  if (isSignedIn && !isAppLocked && !isSecurityScreen) {
     return <Redirect href="/(app)/(tabs)" />;
   }
   
@@ -30,6 +59,7 @@ export default function AuthLayout() {
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
         animation: 'slide_from_right',
+        gestureEnabled: false, // Prevent swipe back on security screens
       }}
     />
   );

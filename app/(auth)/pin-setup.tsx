@@ -26,9 +26,12 @@ export default function PinSetupScreen() {
     setIsSaving(true);
     try {
       await secureStorage.setPin(pinToSave);
+      await secureStorage.setBiometricSetupComplete(true); // Mark security setup as complete
       await secureStorage.updateLastAuthTime();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.push("/(auth)/biometric-setup");
+      
+      // Go directly to app - security is now set up
+      router.replace("/(app)/(tabs)");
     } catch (err) {
       if (__DEV__) {
         if (__DEV__) console.log("Failed to save PIN:", err);
@@ -202,15 +205,19 @@ export default function PinSetupScreen() {
           </View>
         </View>
 
-        {/* Skip Option */}
-        <Pressable 
-          onPress={() => router.push("/(auth)/biometric-setup")}
-          style={{ alignItems: "center", paddingVertical: 16 }}
-        >
-          <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-            Skip for now
+        {/* Security Note - No skip option */}
+        <View style={{ 
+          alignItems: "center", 
+          paddingVertical: 16,
+          flexDirection: "row",
+          justifyContent: "center",
+          gap: 8,
+        }}>
+          <Ionicons name="shield-checkmark" size={16} color={colors.textMuted} />
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            PIN is required to secure your account
           </Text>
-        </Pressable>
+        </View>
       </View>
     </SafeAreaView>
   );

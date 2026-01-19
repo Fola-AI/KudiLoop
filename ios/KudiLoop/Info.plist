@@ -30,6 +30,12 @@
           <string>kudiloop</string>
         </array>
       </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>exp+kudiloop</string>
+        </array>
+      </dict>
     </array>
     <key>CFBundleVersion</key>
     <string>8</string>

@@ -7,11 +7,19 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
       "ios": {
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_ENV": "development"
+        "EXPO_PUBLIC_ENV": "development",
+        "EXPO_PUBLIC_API_URL": "https://kudiloop.onrender.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bWludC1tb25hcmNoLTI0LmNsZXJrLmFjY291bnRzLmRldiQ",
+        "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME": "dv5up7vpe",
+        "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET": "kudiloop_receipts"
       },
       "channel": "development"
     },
@@ -20,8 +28,15 @@
       "ios": {
         "simulator": false
       },
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
-        "EXPO_PUBLIC_ENV": "preview"
+        "EXPO_PUBLIC_ENV": "preview",
+        "EXPO_PUBLIC_API_URL": "https://kudiloop.onrender.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bWludC1tb25hcmNoLTI0LmNsZXJrLmFjY291bnRzLmRldiQ",
+        "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME": "dv5up7vpe",
+        "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET": "kudiloop_receipts"
       },
       "channel": "preview"
     },
