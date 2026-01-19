@@ -6,3 +6,4 @@ export * from './usePots';
 export * from './useActivity';
 export * from './useInvite';
 export * from './useNotifications';
+export * from './usePartners';

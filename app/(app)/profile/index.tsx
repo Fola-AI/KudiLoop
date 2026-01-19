@@ -1,7 +1,7 @@
 import { View, Text, ScrollView, Pressable, Switch, ActivityIndicator, Modal, Animated } from "react-native";
 import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useState, useRef, useEffect } from "react";
@@ -38,35 +38,35 @@ function SettingsItem({
       }}
       disabled={!onPress}
       style={{
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: "row",
+        alignItems: "center",
         paddingVertical: 14,
         paddingHorizontal: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#1f2937',
+        borderBottomColor: "#1f2937",
       }}
     >
-      <View style={{
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        backgroundColor: iconBg,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          backgroundColor: iconBg,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Ionicons name={icon as any} size={20} color="white" />
       </View>
-      
+
       <View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
-        <Text style={{ color: 'white', fontSize: 15, fontWeight: '500' }}>{title}</Text>
+        <Text style={{ color: "white", fontSize: 15, fontWeight: "500" }}>{title}</Text>
         {subtitle && (
-          <Text style={{ color: '#6b7280', fontSize: 13, marginTop: 2 }}>{subtitle}</Text>
+          <Text style={{ color: "#6b7280", fontSize: 13, marginTop: 2 }}>{subtitle}</Text>
         )}
       </View>
-      
-      {onPress && (
-        <Ionicons name="chevron-forward" size={20} color="#4b5563" />
-      )}
+
+      {onPress && <Ionicons name="chevron-forward" size={20} color="#4b5563" />}
     </Pressable>
   );
 }
@@ -86,36 +86,40 @@ function ToggleItem({
   onValueChange: (value: boolean) => void;
 }) {
   return (
-    <View style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: '#1f2937',
-    }}>
-      <View style={{
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        backgroundColor: iconBg,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#1f2937",
+      }}
+    >
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          backgroundColor: iconBg,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Ionicons name={icon as any} size={20} color="white" />
       </View>
-      
-      <Text style={{ flex: 1, marginLeft: 12, color: 'white', fontSize: 15, fontWeight: '500' }}>
+
+      <Text style={{ flex: 1, marginLeft: 12, color: "white", fontSize: 15, fontWeight: "500" }}>
         {title}
       </Text>
-      
+
       <Switch
         value={value}
         onValueChange={(val) => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onValueChange(val);
         }}
-        trackColor={{ false: '#374151', true: colors.primary.DEFAULT }}
+        trackColor={{ false: "#374151", true: colors.primary.DEFAULT }}
         thumbColor="white"
       />
     </View>
@@ -125,16 +129,18 @@ function ToggleItem({
 // Section Header
 function SectionHeader({ title }: { title: string }) {
   return (
-    <Text style={{ 
-      color: '#6b7280', 
-      fontSize: 12, 
-      fontWeight: '600', 
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      paddingHorizontal: 16,
-      paddingTop: 24,
-      paddingBottom: 8,
-    }}>
+    <Text
+      style={{
+        color: "#6b7280",
+        fontSize: 12,
+        fontWeight: "600",
+        textTransform: "uppercase",
+        letterSpacing: 1,
+        paddingHorizontal: 16,
+        paddingTop: 24,
+        paddingBottom: 8,
+      }}
+    >
       {title}
     </Text>
   );
@@ -190,27 +196,19 @@ function TimeoutPickerSheet({
   if (!visible) return null;
 
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="none"
-      onRequestClose={onClose}
-    >
-      <Pressable 
-        style={{ flex: 1 }}
-        onPress={onClose}
-      >
-        <Animated.View 
-          style={{ 
-            flex: 1, 
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'flex-end',
+    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1 }} onPress={onClose}>
+        <Animated.View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
             opacity: fadeAnim,
           }}
         >
           <Pressable onPress={(e) => e.stopPropagation()}>
-            <Animated.View 
-              style={{ 
+            <Animated.View
+              style={{
                 backgroundColor: colors.card,
                 borderTopLeftRadius: 20,
                 borderTopRightRadius: 20,
@@ -220,37 +218,40 @@ function TimeoutPickerSheet({
               }}
             >
               {/* Handle bar */}
-              <View style={{ 
-                alignItems: 'center', 
-                paddingVertical: 12,
-              }}>
-                <View style={{ 
-                  width: 40, 
-                  height: 4, 
-                  backgroundColor: '#4b5563', 
-                  borderRadius: 2,
-                }} />
+              <View style={{ alignItems: "center", paddingVertical: 12 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 4,
+                    backgroundColor: "#4b5563",
+                    borderRadius: 2,
+                  }}
+                />
               </View>
 
               {/* Title */}
-              <Text style={{ 
-                color: 'white', 
-                fontSize: 18, 
-                fontWeight: '600',
-                textAlign: 'center',
-                paddingBottom: 16,
-              }}>
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 18,
+                  fontWeight: "600",
+                  textAlign: "center",
+                  paddingBottom: 16,
+                }}
+              >
                 Auto-lock Timeout
               </Text>
 
               {/* Description */}
-              <Text style={{ 
-                color: '#9ca3af', 
-                fontSize: 14, 
-                textAlign: 'center',
-                paddingHorizontal: 24,
-                paddingBottom: 20,
-              }}>
+              <Text
+                style={{
+                  color: "#9ca3af",
+                  fontSize: 14,
+                  textAlign: "center",
+                  paddingHorizontal: 24,
+                  paddingBottom: 20,
+                }}
+              >
                 Your app will lock after this period of inactivity
               </Text>
 
@@ -263,31 +264,29 @@ function TimeoutPickerSheet({
                     onSelect(option.value);
                   }}
                   style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                     paddingVertical: 16,
                     paddingHorizontal: 24,
-                    backgroundColor: pressed ? 'rgba(255,255,255,0.05)' : 'transparent',
+                    backgroundColor: pressed ? "rgba(255,255,255,0.05)" : "transparent",
                     borderTopWidth: index === 0 ? 1 : 0,
                     borderBottomWidth: 1,
-                    borderColor: '#1f2937',
+                    borderColor: "#1f2937",
                   })}
                 >
-                  <Text style={{ 
-                    color: currentValue === option.value ? colors.primary.DEFAULT : 'white', 
-                    fontSize: 16,
-                    fontWeight: currentValue === option.value ? '600' : '400',
-                  }}>
+                  <Text
+                    style={{
+                      color: currentValue === option.value ? colors.primary.DEFAULT : "white",
+                      fontSize: 16,
+                      fontWeight: currentValue === option.value ? "600" : "400",
+                    }}
+                  >
                     {option.label}
                   </Text>
-                  
+
                   {currentValue === option.value && (
-                    <Ionicons 
-                      name="checkmark-circle" 
-                      size={24} 
-                      color={colors.primary.DEFAULT} 
-                    />
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary.DEFAULT} />
                   )}
                 </Pressable>
               ))}
@@ -303,13 +302,11 @@ function TimeoutPickerSheet({
                   marginHorizontal: 24,
                   paddingVertical: 14,
                   borderRadius: 12,
-                  backgroundColor: pressed ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
-                  alignItems: 'center',
+                  backgroundColor: pressed ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)",
+                  alignItems: "center",
                 })}
               >
-                <Text style={{ color: '#9ca3af', fontSize: 16, fontWeight: '500' }}>
-                  Cancel
-                </Text>
+                <Text style={{ color: "#9ca3af", fontSize: 16, fontWeight: "500" }}>Cancel</Text>
               </Pressable>
             </Animated.View>
           </Pressable>
@@ -320,6 +317,7 @@ function TimeoutPickerSheet({
 }
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { user, clerkUser, signOut } = useAuth();
   const { data: groups } = useGroups();
   const { data: userSettings } = useUserSettings();
@@ -332,7 +330,7 @@ export default function ProfileScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showTimeoutPicker, setShowTimeoutPicker] = useState(false);
-  
+
   // Sync local state with server settings
   useEffect(() => {
     if (userSettings) {
@@ -341,28 +339,28 @@ export default function ProfileScreen() {
       setEmailEnabled(userSettings.emailNotificationsEnabled === 1);
     }
   }, [userSettings]);
-  
+
   // Debug: Log user data on profile page
   if (__DEV__) {
-    console.log('👤 Profile Page - user.profileImageUrl:', user?.profileImageUrl);
-    console.log('👤 Profile Page - user.avatarChoice:', user?.avatarChoice);
+    console.log("Profile Page - user.profileImageUrl:", user?.profileImageUrl);
+    console.log("Profile Page - user.avatarChoice:", user?.avatarChoice);
   }
-  
+
   // Use real user data from backend or Clerk
-  const firstName = user?.firstName || clerkUser?.firstName || 'User';
-  const lastName = user?.lastName || clerkUser?.lastName || '';
-  const email = user?.email || clerkUser?.email || '';
-  const phone = user?.phone || '';
+  const firstName = user?.firstName || clerkUser?.firstName || "User";
+  const lastName = user?.lastName || clerkUser?.lastName || "";
+  const email = user?.email || clerkUser?.email || "";
+  const phone = user?.phone || "";
   const fullName = `${firstName} ${lastName}`.trim();
   const groupCount = groups?.length || 0;
-  
+
   // Get current timeout value (default to 5 minutes)
   const currentTimeoutMinutes = userSettings?.inactivityTimeoutMinutes || 5;
-  const timeoutLabel = currentTimeoutMinutes === 1 ? '1 minute' : `${currentTimeoutMinutes} minutes`;
-  
+  const timeoutLabel = currentTimeoutMinutes === 1 ? "1 minute" : `${currentTimeoutMinutes} minutes`;
+
   const handleTimeoutSelect = async (minutes: number) => {
     setShowTimeoutPicker(false);
-    
+
     try {
       await updateSettings.mutateAsync({
         inactivityTimeoutMinutes: minutes,
@@ -370,11 +368,11 @@ export default function ProfileScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      if (__DEV__) console.error('Failed to update timeout setting:', error);
-      safeAlert('Error', 'Failed to update auto-lock timeout. Please try again.');
+      if (__DEV__) console.error("Failed to update timeout setting:", error);
+      safeAlert("Error", "Failed to update auto-lock timeout. Please try again.");
     }
   };
-  
+
   const handleBiometricToggle = async (enabled: boolean) => {
     setBiometricEnabled(enabled);
     try {
@@ -383,10 +381,10 @@ export default function ProfileScreen() {
       });
     } catch (error) {
       setBiometricEnabled(!enabled); // Revert on error
-      if (__DEV__) console.error('Failed to update biometric setting:', error);
+      if (__DEV__) console.error("Failed to update biometric setting:", error);
     }
   };
-  
+
   const handlePushToggle = async (enabled: boolean) => {
     setPushEnabled(enabled);
     try {
@@ -395,10 +393,10 @@ export default function ProfileScreen() {
       });
     } catch (error) {
       setPushEnabled(!enabled); // Revert on error
-      if (__DEV__) console.error('Failed to update push notification setting:', error);
+      if (__DEV__) console.error("Failed to update push notification setting:", error);
     }
   };
-  
+
   const handleEmailToggle = async (enabled: boolean) => {
     setEmailEnabled(enabled);
     try {
@@ -407,56 +405,52 @@ export default function ProfileScreen() {
       });
     } catch (error) {
       setEmailEnabled(!enabled); // Revert on error
-      if (__DEV__) console.error('Failed to update email notification setting:', error);
+      if (__DEV__) console.error("Failed to update email notification setting:", error);
     }
   };
-  
+
   const handleSignOut = () => {
-    safeAlert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Sign Out", 
-          style: "destructive",
-          onPress: async () => {
-            setIsSigningOut(true);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            try {
-              // Deregister push token first (so we don't get notifications after sign out)
-              await deregisterToken();
-              await signOut();
-              // The AuthContext will handle redirect via the layout
-            } catch (error) {
-              if (__DEV__) console.error('Sign out error:', error);
-              safeAlert('Error', 'Failed to sign out. Please try again.');
-            } finally {
-              setIsSigningOut(false);
-            }
+    safeAlert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          setIsSigningOut(true);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          try {
+            // Deregister push token first (so we don't get notifications after sign out)
+            await deregisterToken();
+            await signOut();
+            // The AuthContext will handle redirect via the layout
+          } catch (error) {
+            if (__DEV__) console.error("Sign out error:", error);
+            safeAlert("Error", "Failed to sign out. Please try again.");
+          } finally {
+            setIsSigningOut(false);
           }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleDeleteAccount = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    
+
     safeAlert(
       "Delete Account",
-      "Are you sure you want to permanently delete your account?\n\nThis will delete:\n• Your profile and personal data\n• All your group memberships\n• Your contribution history\n• Your savings pots\n\nThis action cannot be undone.",
+      "Are you sure you want to permanently delete your account?\n\nThis will delete:\n- Your profile and personal data\n- All your group memberships\n- Your contribution history\n- Your savings pots\n\nThis action cannot be undone.",
       [
-        { 
-          text: "Cancel", 
-          style: "cancel" 
+        {
+          text: "Cancel",
+          style: "cancel",
         },
-        { 
-          text: "Delete My Account", 
+        {
+          text: "Delete My Account",
           style: "destructive",
           onPress: () => confirmDeleteAccount(),
         },
-      ]
+      ],
     );
   };
 
@@ -467,22 +461,22 @@ export default function ProfileScreen() {
       "This will permanently delete your account and all associated data. Are you absolutely sure?",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Yes, Delete Everything", 
+        {
+          text: "Yes, Delete Everything",
           style: "destructive",
           onPress: () => performAccountDeletion(),
         },
-      ]
+      ],
     );
   };
 
   const performAccountDeletion = async () => {
     setIsDeleting(true);
-    
+
     try {
       // 1. Call backend to delete account
       await deleteAccountMutation.mutateAsync();
-      
+
       // 2. Clear local secure storage
       try {
         await SecureStore.deleteItemAsync("pin_hash");
@@ -490,78 +484,109 @@ export default function ProfileScreen() {
         await SecureStore.deleteItemAsync("biometric_enabled");
         await SecureStore.deleteItemAsync("clerk_token");
       } catch (storageError) {
-        if (__DEV__) console.log('Error clearing secure storage:', storageError);
+        if (__DEV__) console.log("Error clearing secure storage:", storageError);
       }
-      
+
       // 3. Clear AsyncStorage cached data
       try {
         await AsyncStorage.clear();
       } catch (asyncError) {
-        if (__DEV__) console.log('Error clearing async storage:', asyncError);
+        if (__DEV__) console.log("Error clearing async storage:", asyncError);
       }
-      
+
       // 4. Sign out from Clerk
       await signOut();
-      
+
       // 5. Show success and redirect
-      safeAlert(
-        "Account Deleted",
-        "Your account has been permanently deleted.",
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace("/(auth)/welcome"),
-          }
-        ]
-      );
-      
+      safeAlert("Account Deleted", "Your account has been permanently deleted.", [
+        {
+          text: "OK",
+          onPress: () => router.replace("/(auth)/welcome"),
+        },
+      ]);
     } catch (error) {
       if (__DEV__) console.error("Delete account error:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       safeAlert(
         "Error",
         "Failed to delete your account. Please try again or contact support at support@kudiloop.com",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
     } finally {
       setIsDeleting(false);
     }
   };
-  
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Header */}
-        <Text style={{ fontSize: 28, fontWeight: 'bold', color: 'white', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24 }}>
-          Profile
-        </Text>
-        
+        {/* Header with back button */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+          }}
+        >
+          <Pressable
+            onPress={() => router.back()}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: colors.card,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </Pressable>
+          <Text
+            style={{
+              flex: 1,
+              textAlign: "center",
+              fontSize: 18,
+              fontWeight: "600",
+              color: colors.text,
+              marginRight: 40,
+            }}
+          >
+            Profile
+          </Text>
+        </View>
+
         {/* User Card */}
         <View style={{ paddingHorizontal: 16 }}>
           <Pressable
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/profile/edit');
+              router.push("/profile/edit");
             }}
           >
             <Card variant="elevated" style={{ padding: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Avatar 
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Avatar
                   source={user?.profileImageUrl}
                   avatarChoice={user?.avatarChoice}
-                  name={fullName} 
-                  size="xl" 
+                  name={fullName}
+                  size="xl"
                 />
                 <View style={{ flex: 1, marginLeft: 16 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>{fullName}</Text>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.success.DEFAULT} style={{ marginLeft: 6 }} />
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>{fullName}</Text>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color={colors.success.DEFAULT}
+                      style={{ marginLeft: 6 }}
+                    />
                   </View>
-                  <Text style={{ color: '#9ca3af', fontSize: 14, marginTop: 2 }}>{email}</Text>
-                  <View style={{ flexDirection: 'row', marginTop: 8, gap: 16 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 2 }}>{email}</Text>
+                  <View style={{ flexDirection: "row", marginTop: 8, gap: 16 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
                       <Ionicons name="people-outline" size={14} color="#6b7280" />
-                      <Text style={{ color: '#6b7280', fontSize: 12, marginLeft: 4 }}>
+                      <Text style={{ color: "#6b7280", fontSize: 12, marginLeft: 4 }}>
                         {groupCount} groups
                       </Text>
                     </View>
@@ -572,40 +597,40 @@ export default function ProfileScreen() {
             </Card>
           </Pressable>
         </View>
-        
+
         {/* Account Section */}
         <SectionHeader title="Account" />
-        <Card style={{ marginHorizontal: 16, overflow: 'hidden' }} padding="none">
+        <Card style={{ marginHorizontal: 16, overflow: "hidden" }} padding="none">
           <SettingsItem
             icon="person-outline"
             iconBg="#3b82f6"
             title="Personal Information"
-            onPress={() => router.push('/profile/edit')}
+            onPress={() => router.push("/profile/edit")}
           />
           <SettingsItem
             icon="call-outline"
             iconBg="#10b981"
             title="Phone Number"
-            subtitle={phone || 'Not set'}
-            onPress={() => router.push('/profile/edit')}
+            subtitle={phone || "Not set"}
+            onPress={() => router.push("/profile/edit")}
           />
           <SettingsItem
             icon="business-outline"
             iconBg="#8b5cf6"
             title="Bank Accounts"
-            onPress={() => router.push('/profile/banks')}
+            onPress={() => router.push("/profile/banks")}
           />
           <SettingsItem
             icon="wallet-outline"
             iconBg="#f59e0b"
             title="Savings Pots"
-            onPress={() => router.push('/profile/pots')}
+            onPress={() => router.push("/profile/pots")}
           />
         </Card>
-        
+
         {/* Security Section */}
         <SectionHeader title="Security" />
-        <Card style={{ marginHorizontal: 16, overflow: 'hidden' }} padding="none">
+        <Card style={{ marginHorizontal: 16, overflow: "hidden" }} padding="none">
           <SettingsItem
             icon="lock-closed-outline"
             iconBg="#ef4444"
@@ -633,15 +658,15 @@ export default function ProfileScreen() {
             onValueChange={handleBiometricToggle}
           />
         </Card>
-        
+
         {/* Notifications Section */}
         <SectionHeader title="Notifications" />
-        <Card style={{ marginHorizontal: 16, overflow: 'hidden' }} padding="none">
+        <Card style={{ marginHorizontal: 16, overflow: "hidden" }} padding="none">
           <SettingsItem
             icon="notifications-outline"
             iconBg="#f59e0b"
             title="View Notifications"
-            onPress={() => router.push('/notifications')}
+            onPress={() => router.push("/notifications")}
           />
           <ToggleItem
             icon="notifications-outline"
@@ -658,10 +683,10 @@ export default function ProfileScreen() {
             onValueChange={handleEmailToggle}
           />
         </Card>
-        
+
         {/* Preferences Section */}
         <SectionHeader title="Preferences" />
-        <Card style={{ marginHorizontal: 16, overflow: 'hidden' }} padding="none">
+        <Card style={{ marginHorizontal: 16, overflow: "hidden" }} padding="none">
           <SettingsItem
             icon="cash-outline"
             iconBg="#10b981"
@@ -677,10 +702,55 @@ export default function ProfileScreen() {
             onPress={() => safeAlert("Coming Soon", "Theme selection will be available soon")}
           />
         </Card>
-        
+
+        {user?.isAdmin === 1 && (
+          <View style={{ marginTop: 24 }}>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "600",
+                color: colors.textMuted,
+                marginBottom: 8,
+                paddingHorizontal: 16,
+                textTransform: "uppercase",
+                letterSpacing: 1,
+              }}
+            >
+              Admin
+            </Text>
+            <Pressable
+              onPress={() => router.push("/admin")}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: pressed ? colors.cardElevated : colors.card,
+                marginHorizontal: 16,
+                padding: 16,
+                borderRadius: 12,
+              })}
+            >
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: "rgba(239, 68, 68, 0.15)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 12,
+                }}
+              >
+                <Ionicons name="shield-checkmark" size={20} color={colors.error.DEFAULT} />
+              </View>
+              <Text style={{ flex: 1, fontSize: 16, color: colors.text }}>Admin Panel</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </Pressable>
+          </View>
+        )}
+
         {/* Support Section */}
         <SectionHeader title="Support" />
-        <Card style={{ marginHorizontal: 16, overflow: 'hidden' }} padding="none">
+        <Card style={{ marginHorizontal: 16, overflow: "hidden" }} padding="none">
           <SettingsItem
             icon="help-circle-outline"
             iconBg="#3b82f6"
@@ -694,36 +764,36 @@ export default function ProfileScreen() {
             onPress={() => safeAlert("Support", "Email us at support@kudiloop.com")}
           />
         </Card>
-        
+
         {/* Legal Section */}
         <SectionHeader title="Legal" />
-        <Card style={{ marginHorizontal: 16, overflow: 'hidden' }} padding="none">
+        <Card style={{ marginHorizontal: 16, overflow: "hidden" }} padding="none">
           <SettingsItem
             icon="document-text-outline"
             iconBg="#6b7280"
             title="Terms of Service"
-            onPress={() => router.push('/terms')}
+            onPress={() => router.push("/terms")}
           />
           <SettingsItem
             icon="shield-outline"
             iconBg="#6b7280"
             title="Privacy Policy"
-            onPress={() => router.push('/privacy')}
+            onPress={() => router.push("/privacy")}
           />
         </Card>
-        
+
         {/* Sign Out */}
         <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
           <Pressable
             onPress={handleSignOut}
             disabled={isSigningOut}
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
               paddingVertical: 16,
               borderRadius: 12,
-              backgroundColor: 'rgba(239,68,68,0.1)',
+              backgroundColor: "rgba(239,68,68,0.1)",
               opacity: isSigningOut ? 0.5 : 1,
             }}
           >
@@ -732,12 +802,14 @@ export default function ProfileScreen() {
             ) : (
               <>
                 <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-                <Text style={{ color: '#ef4444', fontSize: 16, fontWeight: '600', marginLeft: 8 }}>Sign Out</Text>
+                <Text style={{ color: "#ef4444", fontSize: 16, fontWeight: "600", marginLeft: 8 }}>
+                  Sign Out
+                </Text>
               </>
             )}
           </Pressable>
         </View>
-        
+
         {/* Delete Account - Apple App Store requirement */}
         <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
           <Pressable
@@ -760,22 +832,24 @@ export default function ProfileScreen() {
               </Text>
             )}
           </Pressable>
-          <Text style={{ 
-            color: colors.textSubtle, 
-            fontSize: 12, 
-            textAlign: "center",
-            marginTop: 8,
-          }}>
+          <Text
+            style={{
+              color: colors.textSubtle,
+              fontSize: 12,
+              textAlign: "center",
+              marginTop: 8,
+            }}
+          >
             Permanently delete your account and all data
           </Text>
         </View>
-        
+
         {/* App Version */}
-        <Text style={{ color: '#4b5563', fontSize: 12, textAlign: 'center', paddingTop: 8 }}>
+        <Text style={{ color: "#4b5563", fontSize: 12, textAlign: "center", paddingTop: 8 }}>
           KudiLoop v1.0.0
         </Text>
       </ScrollView>
-      
+
       {/* Timeout Picker Bottom Sheet */}
       <TimeoutPickerSheet
         visible={showTimeoutPicker}
@@ -786,3 +860,4 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
+

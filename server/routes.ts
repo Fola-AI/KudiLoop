@@ -3410,7 +3410,7 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
 
       // Audit log
       await storage.createAuditEvent({
-        actorId: req.user.id,
+        actorId: req.adminUser.id,
         action: 'create_partner',
         metadata: {
           targetType: 'partner',
@@ -3457,9 +3457,9 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
       const updatedPartner = await storage.updatePartner(partnerId, { logoUrl });
       
       // Audit log
-      if (req.user?.id) {
+      if (req.adminUser?.id) {
         await storage.createAuditEvent({
-          actorId: req.user.id,
+          actorId: req.adminUser.id,
           action: 'upload_partner_logo',
           metadata: {
             targetType: 'partner',
@@ -3488,7 +3488,7 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
   app.patch('/api/partners/:id', authMiddleware, isAdmin, async (req: any, res) => {
     try {
       console.log('[Partner Update] Request body:', JSON.stringify(req.body));
-      console.log('[Partner Update] User:', req.user ? `ID: ${req.user.id}` : 'UNDEFINED');
+      console.log('[Partner Update] User:', req.adminUser ? `ID: ${req.adminUser.id}` : 'UNDEFINED');
       
       const updates = schema.insertPartnerSchema.partial().parse(req.body);
       console.log('[Partner Update] Parsed updates:', JSON.stringify(updates));
@@ -3502,9 +3502,9 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
       console.log('[Partner Update] Partner updated successfully:', partner.id);
 
       // Audit log - only if user is defined
-      if (req.user?.id) {
+      if (req.adminUser?.id) {
         await storage.createAuditEvent({
-          actorId: req.user.id,
+          actorId: req.adminUser.id,
           action: 'update_partner',
           metadata: {
             targetType: 'partner',
@@ -3538,7 +3538,7 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
 
       // Audit log
       await storage.createAuditEvent({
-        actorId: req.user.id,
+        actorId: req.adminUser.id,
         action: 'delete_partner',
         metadata: {
           targetType: 'partner',
@@ -4174,6 +4174,117 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
 
     res.header('Content-Type', 'application/xml');
     res.send(sitemap);
+  });
+
+  // ============================================================================
+  // CRON JOB ENDPOINTS - Scheduled Tasks
+  // ============================================================================
+
+  // Cron: Send contribution reminders (run daily)
+  // This endpoint should be called by Render Cron Job
+  app.post('/api/cron/contribution-reminders', async (req, res) => {
+    // Simple API key auth for cron jobs
+    const cronSecret = process.env.CRON_SECRET;
+    const providedSecret = req.headers['x-cron-secret'];
+
+    if (cronSecret && providedSecret !== cronSecret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const { sendPushNotifications } = await import('./utils/pushNotifications');
+
+      // Get all active groups
+      const groups = await storage.getActiveGroups();
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+
+      let notificationsSent = 0;
+      let errors: string[] = [];
+
+      for (const group of groups) {
+        const collectionDate = group.nextCollectionDate
+          ? new Date(group.nextCollectionDate).toISOString().split('T')[0]
+          : null;
+
+        // Check if collection date is tomorrow or today
+        if (!collectionDate || (collectionDate !== tomorrowStr && collectionDate !== todayStr)) {
+          continue; // Skip groups not due soon
+        }
+
+        const daysText = collectionDate === todayStr ? 'today' : 'tomorrow';
+
+        // Get all members who haven't paid for current cycle
+        const contributions = await storage.getContributionsByGroupAndCycle(
+          group.id,
+          group.currentCycle
+        );
+        const unpaidMemberIds = contributions
+          .filter(c => c.status === 'pending')
+          .map(c => c.memberId);
+
+        if (unpaidMemberIds.length === 0) continue;
+
+        // Get members with their user IDs
+        const members = await storage.getMembersByGroup(group.id);
+        const unpaidMembers = members.filter(m =>
+          unpaidMemberIds.includes(m.id) && m.userId
+        );
+
+        const notifications: { token: string; title: string; body: string; data: any }[] = [];
+
+        for (const member of unpaidMembers) {
+          if (!member.userId) continue;
+
+          const tokens = await storage.getUserDeviceTokens(member.userId);
+
+          for (const tokenRecord of tokens) {
+            if (tokenRecord.isActive) {
+              const amount = new Intl.NumberFormat('en-NG', {
+                style: 'currency',
+                currency: group.currency,
+                minimumFractionDigits: 0,
+              }).format(group.contributionAmount);
+
+              notifications.push({
+                token: tokenRecord.token,
+                title: '💰 Contribution Reminder',
+                body: `Your ${amount} contribution to ${group.name} is due ${daysText}`,
+                data: {
+                  type: 'contribution_reminder',
+                  groupId: group.id,
+                  groupName: group.name,
+                },
+              });
+            }
+          }
+        }
+
+        if (notifications.length > 0) {
+          const result = await sendPushNotifications(notifications);
+          notificationsSent += result.success;
+          if (result.errors.length > 0) {
+            errors = errors.concat(result.errors);
+          }
+        }
+      }
+
+      console.log(`[Cron] Contribution reminders: ${notificationsSent} sent`);
+
+      res.json({
+        success: true,
+        notificationsSent,
+        errors: errors.slice(0, 10),
+      });
+    } catch (error: any) {
+      console.error('[Cron] Contribution reminders error:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   const httpServer = createServer(app);

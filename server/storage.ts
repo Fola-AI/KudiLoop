@@ -59,6 +59,7 @@ export interface IStorage {
   createGroup(group: GroupCreateInput): Promise<Group>;
   getGroup(id: string, userId?: string): Promise<Group | undefined>;
   getAllGroups(userId?: string): Promise<Group[]>;
+  getActiveGroups(): Promise<Group[]>;
   updateGroup(id: string, updates: Partial<InsertGroup>, userId?: string): Promise<Group | undefined>;
   
   // Members
@@ -204,6 +205,7 @@ export interface IStorage {
   // Device Tokens (Push Notifications)
   registerDeviceToken(token: schema.InsertDeviceToken): Promise<schema.DeviceToken>;
   getDeviceTokensByUser(userId: string): Promise<schema.DeviceToken[]>;
+  getUserDeviceTokens(userId: string): Promise<schema.DeviceToken[]>;
   updateDeviceTokenLastUsed(token: string): Promise<schema.DeviceToken | undefined>;
   deactivateDeviceToken(token: string): Promise<boolean>;
   
@@ -391,6 +393,18 @@ export class DbStorage implements IStorage {
         or(
           sql`${schema.groups.completedAt} IS NULL`,
           sql`${schema.groups.completedAt} > ${oneWeekAgo}`
+        )
+      );
+  }
+
+  async getActiveGroups(): Promise<Group[]> {
+    return await db
+      .select()
+      .from(schema.groups)
+      .where(
+        and(
+          eq(schema.groups.status, "active"),
+          eq(schema.groups.isLive, 1)
         )
       );
   }
@@ -1647,6 +1661,10 @@ export class DbStorage implements IStorage {
         eq(schema.deviceTokens.isActive, 1)
       ))
       .orderBy(desc(schema.deviceTokens.lastUsed));
+  }
+
+  async getUserDeviceTokens(userId: string): Promise<schema.DeviceToken[]> {
+    return await this.getDeviceTokensByUser(userId);
   }
 
   async updateDeviceTokenLastUsed(token: string): Promise<schema.DeviceToken | undefined> {

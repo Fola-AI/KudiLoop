@@ -173,7 +173,7 @@ export default function HomeScreen() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/(app)/(tabs)/profile");
+            router.push("/profile");
           }}
           style={({ pressed }) => ({
             opacity: pressed ? 0.8 : 1,

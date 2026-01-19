@@ -384,6 +384,7 @@ export const partners = pgTable("partners", {
   affiliateLink: text("affiliate_link").notNull(),
   commissionRate: varchar("commission_rate", { length: 100 }),
   logoUrl: text("logo_url"),
+  bannerUrl: text("banner_url"),
   color: varchar("color", { length: 50 }).notNull().default('from-blue-500 to-cyan-500'),
   isActive: integer("is_active").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
