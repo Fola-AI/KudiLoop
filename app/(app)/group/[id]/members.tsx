@@ -13,6 +13,7 @@ function MemberCard({
   member, 
   isCurrentUser,
   isCurrentBeneficiary,
+  showReceivingBadge,
   isAdmin,
   groupId,
   currentCycle,
@@ -20,6 +21,7 @@ function MemberCard({
   member: Member;
   isCurrentUser: boolean;
   isCurrentBeneficiary: boolean;
+  showReceivingBadge: boolean;
   isAdmin: boolean;
   groupId: string;
   currentCycle: number;
@@ -49,41 +51,15 @@ function MemberCard({
   };
   
   return (
-    <Pressable
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push(`/group/${groupId}/member/${member.id}`);
-      }}
-      style={({ pressed }) => ({
-        opacity: pressed ? 0.8 : 1,
-      })}
-    >
+    <View>
       <Card style={{ marginHorizontal: 16, marginBottom: 12 }}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {/* Avatar with position badge */}
-          <View style={{ position: "relative" }}>
-            <Avatar 
-              name={memberName} 
-              size="lg"
-              showBorder={isCurrentBeneficiary}
-              borderColor={colors.primary.DEFAULT}
-            />
-            <View style={{ 
-              position: "absolute", 
-              bottom: -4, 
-              right: -4, 
-              width: 24, 
-              height: 24, 
-              borderRadius: 12, 
-              backgroundColor: colors.cardElevated, 
-              alignItems: "center", 
-              justifyContent: "center",
-              borderWidth: 2,
-              borderColor: colors.card,
-            }}>
-              <Text style={{ fontSize: 11, fontWeight: "700", color: colors.text }}>{member.rotationOrder || '?'}</Text>
-            </View>
-          </View>
+          <Avatar 
+            name={memberName} 
+            size="lg"
+            showBorder={isCurrentBeneficiary}
+            borderColor={colors.primary.DEFAULT}
+          />
           
           {/* Member Info */}
           <View style={{ flex: 1, marginLeft: 16 }}>
@@ -92,7 +68,7 @@ function MemberCard({
               {isCurrentUser && <Badge variant="info" style={{ marginRight: 4 }}>You</Badge>}
               {member.role === "creator" && <Badge variant="default" style={{ marginRight: 4 }}>Creator</Badge>}
               {member.isAdmin === 1 && member.role !== "creator" && <Badge variant="warning" style={{ marginRight: 4 }}>Co-Admin</Badge>}
-              {isCurrentBeneficiary && <Badge variant="success">Receiving</Badge>}
+              {isCurrentBeneficiary && showReceivingBadge && <Badge variant="success">Receiving</Badge>}
             </View>
             
             <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
@@ -135,11 +111,10 @@ function MemberCard({
                 <Ionicons name="ellipsis-vertical" size={20} color={colors.textMuted} />
               </Pressable>
             )}
-            <Ionicons name="chevron-forward" size={20} color={colors.textSubtle} />
           </View>
         </View>
       </Card>
-    </Pressable>
+    </View>
   );
 }
 
@@ -218,6 +193,18 @@ export default function MembersScreen() {
   const isGroupAdmin = group?.isAdmin || false;
   const currentCycle = group?.currentCycle || 1;
   const currentUserId = group?.currentUserId;
+  const isAdminOrCreator = Boolean(
+    group?.isOwner
+    || group?.isAdmin
+    || group?.myMembership?.isAdmin === 1
+    || group?.myMembership?.role === 'creator'
+  );
+  const recipientVisibility = group?.recipientVisibility;
+  const canSeeRecipient = isAdminOrCreator
+    || recipientVisibility === 1
+    || recipientVisibility === true
+    || recipientVisibility === undefined
+    || recipientVisibility === null;
   
   // Calculate stats
   const adminCount = membersList.filter(m => m.isAdmin).length;
@@ -280,9 +267,6 @@ export default function MembersScreen() {
               <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary.DEFAULT, marginRight: 4 }} />
               <Text style={{ fontSize: 11, color: colors.textMuted }}>Current Receiver</Text>
             </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 11, color: colors.textSubtle }}>Position # = Rotation Order</Text>
-            </View>
           </View>
           
           {/* Members List */}
@@ -293,6 +277,7 @@ export default function MembersScreen() {
                 member={member}
                 isCurrentUser={member.userId === currentUserId}
                 isCurrentBeneficiary={member.userId === group?.currentBeneficiaryId}
+                showReceivingBadge={canSeeRecipient}
                 isAdmin={isGroupAdmin}
                 groupId={id || ''}
                 currentCycle={currentCycle}

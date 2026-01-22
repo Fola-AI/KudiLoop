@@ -697,32 +697,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Groups endpoints - All require authentication
   app.get("/api/groups", authMiddleware, async (req: any, res) => {
+    console.log("========== DEBUG: GET /api/groups ==========");
+    console.log("1. User making request:", req.user?.id || req.auth?.userId || "NO USER");
     try {
       const userId = getUserId(req);
-      const groups = await storage.getAllGroups(userId);
+      
+      console.log("2. About to fetch initial groups list...");
+      let groups;
+      try {
+        groups = await storage.getAllGroups(userId);
+        console.log("3. Initial groups fetched:", groups.length);
+      } catch (dbError: any) {
+        console.error("❌ DATABASE ERROR fetching groups list:", dbError);
+        console.error("❌ Error message:", dbError?.message);
+        console.error("❌ Error stack:", dbError?.stack);
+        throw dbError;
+      }
       
       // Check and update go-live status for groups that are due
       const now = new Date();
-      await Promise.all(
-        groups
-          .filter(g => !g.isLive && new Date(g.goLiveDate) <= now)
-          .map(g => checkAndUpdateGoLiveStatus(g.id))
-      );
+      console.log("4. About to check go-live updates...");
+      try {
+        await Promise.all(
+          groups
+            .filter(g => !g.isLive && new Date(g.goLiveDate) <= now)
+            .map(g => checkAndUpdateGoLiveStatus(g.id))
+        );
+        console.log("5. Go-live update check complete");
+      } catch (dbError: any) {
+        console.error("❌ DATABASE ERROR updating go-live status:", dbError);
+        console.error("❌ Error message:", dbError?.message);
+        console.error("❌ Error stack:", dbError?.stack);
+        throw dbError;
+      }
       
       // Re-fetch groups to get updated status
-      const updatedGroups = await storage.getAllGroups(userId);
-      const groupsWithMembers = await Promise.all(
-        updatedGroups.map(async (group) => {
-          const members = await storage.getMembersByGroup(group.id);
-          return {
-            ...group,
-            members,
-            currentRecipientId: members.find(m => m.rotationOrder === group.currentCycle)?.id || null,
-          };
-        })
-      );
+      console.log("6. About to re-fetch groups list...");
+      let updatedGroups;
+      try {
+        updatedGroups = await storage.getAllGroups(userId);
+        console.log("7. Updated groups fetched:", updatedGroups.length);
+      } catch (dbError: any) {
+        console.error("❌ DATABASE ERROR re-fetching groups list:", dbError);
+        console.error("❌ Error message:", dbError?.message);
+        console.error("❌ Error stack:", dbError?.stack);
+        throw dbError;
+      }
+      
+      console.log("8. About to attach members...");
+      let groupsWithMembers;
+      try {
+        groupsWithMembers = await Promise.all(
+          updatedGroups.map(async (group) => {
+            const members = await storage.getMembersByGroup(group.id);
+            return {
+              ...group,
+              members,
+              currentRecipientId: members.find(m => m.rotationOrder === group.currentCycle)?.id || null,
+            };
+          })
+        );
+        console.log("9. Groups with members ready:", groupsWithMembers.length);
+      } catch (dbError: any) {
+        console.error("❌ DATABASE ERROR attaching members:", dbError);
+        console.error("❌ Error message:", dbError?.message);
+        console.error("❌ Error stack:", dbError?.stack);
+        throw dbError;
+      }
+      
       res.json(groupsWithMembers);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("========== ERROR IN GET /api/groups ==========");
+      console.error("Error type:", error?.constructor?.name);
+      console.error("Error message:", error?.message);
+      console.error("Error code:", error?.code);
+      console.error("Full error:", error);
+      console.error("Stack trace:", error?.stack);
+      console.error("=============================================");
       res.status(500).json({ error: "Failed to fetch groups" });
     }
   });
@@ -811,26 +862,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/groups/:id", authMiddleware, async (req: any, res) => {
+    console.log("========== DEBUG: GET /api/groups/:id ==========");
+    console.log("1. Group ID requested:", req.params.id);
+    console.log("2. User making request:", req.user?.id || req.auth?.userId || "NO USER");
     try {
       const userId = getUserId(req);
-      
+      const groupId = req.params.id;
+
       // Get group first without side effects
-      const group = await storage.getGroup(req.params.id);
+      console.log("3. About to fetch group from database...");
+      let group;
+      try {
+        group = await storage.getGroup(groupId);
+        console.log("4. Group fetched successfully:", group ? "Found" : "Not found");
+      } catch (dbError: any) {
+        console.error("❌ DATABASE ERROR fetching group:", dbError);
+        console.error("❌ Error message:", dbError?.message);
+        console.error("❌ Error stack:", dbError?.stack);
+        throw dbError;
+      }
       if (!group) {
         return res.status(404).json({ error: "Group not found" });
       }
       
       // AUTHORIZATION CHECK BEFORE ANY MUTATIONS
-      const hasAccess = await storage.isUserGroupMember(group.id, userId);
+      console.log("5. About to check membership access...");
+      let hasAccess = false;
+      try {
+        hasAccess = await storage.isUserGroupMember(group.id, userId);
+        console.log("6. Access check result:", hasAccess);
+      } catch (dbError: any) {
+        console.error("❌ DATABASE ERROR checking membership:", dbError);
+        console.error("❌ Error message:", dbError?.message);
+        console.error("❌ Error stack:", dbError?.stack);
+        throw dbError;
+      }
       if (!hasAccess) {
         return res.status(403).json({ error: "Access denied" });
       }
       
       // Only after authorization, check and update go-live status
-      const updatedGroup = await checkAndUpdateGoLiveStatus(req.params.id);
+      console.log("7. About to check and update go-live status...");
+      let updatedGroup;
+      try {
+        updatedGroup = await checkAndUpdateGoLiveStatus(groupId);
+        console.log("8. Go-live status check complete:", updatedGroup ? "Updated" : "No changes");
+      } catch (dbError: any) {
+        console.error("❌ DATABASE ERROR updating go-live status:", dbError);
+        console.error("❌ Error message:", dbError?.message);
+        console.error("❌ Error stack:", dbError?.stack);
+        throw dbError;
+      }
       const finalGroup = updatedGroup || group;
       
-      const members = await storage.getMembersByGroup(finalGroup.id);
+      console.log("9. About to fetch members...");
+      let members;
+      try {
+        members = await storage.getMembersByGroup(finalGroup.id);
+        console.log("10. Members fetched:", members.length);
+      } catch (dbError: any) {
+        console.error("❌ DATABASE ERROR fetching members:", dbError);
+        console.error("❌ Error message:", dbError?.message);
+        console.error("❌ Error stack:", dbError?.stack);
+        throw dbError;
+      }
       const currentRecipientId = members.find(m => m.rotationOrder === finalGroup.currentCycle)?.id || null;
       
       res.json({
@@ -838,8 +933,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         members,
         currentRecipientId,
       });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch group" });
+    } catch (error: any) {
+      console.error("========== ERROR IN GET /api/groups/:id ==========");
+      console.error("Error type:", error?.constructor?.name);
+      console.error("Error message:", error?.message);
+      console.error("Error code:", error?.code);
+      console.error("Full error:", error);
+      console.error("Stack trace:", error?.stack);
+      console.error("=================================================");
+      
+      res.status(500).json({ 
+        error: "Failed to fetch group details",
+        debug: {
+          message: error?.message,
+          code: error?.code,
+          type: error?.constructor?.name,
+        },
+      });
     }
   });
 
@@ -1173,7 +1283,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Members endpoints - Require authentication and group membership verification
-  // Updated to respect scheduleVisibility setting for non-admin members
   app.get("/api/groups/:groupId/members", authMiddleware, async (req: any, res) => {
     try {
       const userId = getUserId(req);
@@ -1189,16 +1298,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const membership = await storage.getMemberByUserAndGroup(userId, groupId);
       if (!membership) {
         return res.status(403).json({ error: "You are not a member of this group" });
-      }
-      
-      // Second check: Can this user see the member list/schedule?
-      // Admins can always see, others need scheduleVisibility = 1
-      const isAdmin = group.userId === userId || membership.isAdmin === 1 || membership.role === 'creator';
-      const normalizedScheduleVisibility = Number(group.scheduleVisibility ?? 1);
-      const canViewSchedule = isAdmin || normalizedScheduleVisibility === 1;
-      
-      if (!canViewSchedule) {
-        return res.status(403).json({ error: "Schedule is hidden for this group" });
       }
       
       const members = await storage.getMembersByGroup(groupId);

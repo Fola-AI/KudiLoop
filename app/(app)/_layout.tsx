@@ -16,6 +16,7 @@ export default function AppLayout() {
     userError,
     refreshUser,
     clerkUser,
+    isAuthenticating,
   } = useAuth();
   
   // Initialize push notifications
@@ -37,6 +38,7 @@ export default function AppLayout() {
         console.log('🔐 Session timed out - user signed out');
       }
     },
+    isAuthenticating,
   });
   
   // Handle user activity (touch events)

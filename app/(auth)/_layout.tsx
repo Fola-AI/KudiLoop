@@ -1,5 +1,6 @@
-import { Stack, Redirect, usePathname } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
+import { Stack, Redirect, usePathname, router } from 'expo-router';
+import { View, ActivityIndicator, Pressable, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
 import { useState, useEffect } from 'react';
 import { colors } from '@/theme';

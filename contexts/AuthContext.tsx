@@ -8,6 +8,8 @@ interface AuthContextType {
   // Auth state
   isSignedIn: boolean;
   isLoaded: boolean;
+  isAuthenticating: boolean;
+  setIsAuthenticating: (value: boolean) => void;
   
   // Clerk user data
   clerkUser: {
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   
   // Track if we've already fetched for this session
   const hasFetchedRef = useRef(false);
@@ -187,6 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     isSignedIn: isSignedIn ?? false,
     isLoaded,
+    isAuthenticating,
+    setIsAuthenticating,
     clerkUser,
     user,
     isLoadingUser,

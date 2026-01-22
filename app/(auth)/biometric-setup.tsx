@@ -122,6 +122,20 @@ export default function BiometricSetupScreen() {
     router.replace("/(auth)/pin-setup");
   };
 
+  const handleSkip = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await secureStorage.setBiometricEnabled(false);
+      await secureStorage.setBiometricSetupComplete(true);
+      await secureStorage.updateLastAuthTime();
+    } catch (error) {
+      if (__DEV__) {
+        console.log("Failed to skip biometric setup:", error);
+      }
+    }
+    handleComplete();
+  };
+
   const handleComplete = () => {
     // Update last auth time
     secureStorage.updateLastAuthTime();
@@ -344,7 +358,7 @@ export default function BiometricSetupScreen() {
           </View>
         </View>
 
-        {/* Buttons - No skip option */}
+        {/* Buttons */}
         <View style={{ gap: 12 }}>
           <Button onPress={handleEnableBiometrics} loading={loading}>
             {`Enable ${getBiometricName()}`}
@@ -352,7 +366,14 @@ export default function BiometricSetupScreen() {
           <Button variant="ghost" onPress={handleSetupPIN}>
             Use PIN Instead
           </Button>
+          <Button variant="outline" onPress={handleSkip}>
+            Set Up Later
+          </Button>
         </View>
+
+        <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center", marginTop: 12 }}>
+          You can enable biometric login anytime in Settings.
+        </Text>
       </View>
     </SafeAreaView>
   );

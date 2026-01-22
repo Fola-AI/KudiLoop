@@ -318,8 +318,15 @@ export class DbStorage implements IStorage {
   async getGroup(id: string, userId?: string): Promise<Group | undefined> {
     // Always return group by ID - authorization handled at route level
     // userId parameter kept for backward compatibility but not used for filtering
-    const [group] = await db.select().from(schema.groups).where(eq(schema.groups.id, id));
-    return group;
+    console.log("📦 storage.getGroup called with:", id);
+    try {
+      const [group] = await db.select().from(schema.groups).where(eq(schema.groups.id, id));
+      console.log("📦 storage.getGroup result:", group ? "Found" : "Not found");
+      return group;
+    } catch (error) {
+      console.error("📦 storage.getGroup ERROR:", error);
+      throw error;
+    }
   }
 
   async getAllGroups(userId?: string): Promise<Group[]> {
@@ -329,53 +336,65 @@ export class DbStorage implements IStorage {
     if (userId) {
       // Get groups where user is creator OR member
       // First, get groups where user is creator
-      const createdGroups = await db
-        .select()
-        .from(schema.groups)
-        .where(
-          and(
-            eq(schema.groups.userId, userId),
-            or(
-              sql`${schema.groups.completedAt} IS NULL`,
-              sql`${schema.groups.completedAt} > ${oneWeekAgo}`
+      let createdGroups: Group[] = [];
+      try {
+        createdGroups = await db
+          .select()
+          .from(schema.groups)
+          .where(
+            and(
+              eq(schema.groups.userId, userId),
+              or(
+                sql`${schema.groups.completedAt} IS NULL`,
+                sql`${schema.groups.completedAt} > ${oneWeekAgo}`
+              )
             )
-          )
-        );
+          );
+      } catch (error) {
+        console.error("📦 storage.getAllGroups ERROR (createdGroups):", error);
+        throw error;
+      }
       
       // Second, get groups where user is a member
-      const memberGroupsResult = await db
-        .select({
-          id: schema.groups.id,
-          userId: schema.groups.userId,
-          name: schema.groups.name,
-          contributionAmount: schema.groups.contributionAmount,
-          currency: schema.groups.currency,
-          frequency: schema.groups.frequency,
-          totalCycles: schema.groups.totalCycles,
-          currentCycle: schema.groups.currentCycle,
-          goLiveDate: schema.groups.goLiveDate,
-          adjustedGoLiveDate: schema.groups.adjustedGoLiveDate,
-          status: schema.groups.status,
-          visibility: schema.groups.visibility,
-          maxMembers: schema.groups.maxMembers,
-          payoutMedium: schema.groups.payoutMedium,
-          nextCollectionDate: schema.groups.nextCollectionDate,
-          startDate: schema.groups.startDate,
-          isLive: schema.groups.isLive,
-          completedAt: schema.groups.completedAt,
-          createdAt: schema.groups.createdAt,
-        })
-        .from(schema.groups)
-        .innerJoin(schema.members, eq(schema.groups.id, schema.members.groupId))
-        .where(
-          and(
-            eq(schema.members.userId, userId),
-            or(
-              sql`${schema.groups.completedAt} IS NULL`,
-              sql`${schema.groups.completedAt} > ${oneWeekAgo}`
+      let memberGroupsResult: Group[] = [];
+      try {
+        memberGroupsResult = await db
+          .select({
+            id: schema.groups.id,
+            userId: schema.groups.userId,
+            name: schema.groups.name,
+            contributionAmount: schema.groups.contributionAmount,
+            currency: schema.groups.currency,
+            frequency: schema.groups.frequency,
+            totalCycles: schema.groups.totalCycles,
+            currentCycle: schema.groups.currentCycle,
+            goLiveDate: schema.groups.goLiveDate,
+            adjustedGoLiveDate: schema.groups.adjustedGoLiveDate,
+            status: schema.groups.status,
+            visibility: schema.groups.visibility,
+            maxMembers: schema.groups.maxMembers,
+            payoutMedium: schema.groups.payoutMedium,
+            nextCollectionDate: schema.groups.nextCollectionDate,
+            startDate: schema.groups.startDate,
+            isLive: schema.groups.isLive,
+            completedAt: schema.groups.completedAt,
+            createdAt: schema.groups.createdAt,
+          })
+          .from(schema.groups)
+          .innerJoin(schema.members, eq(schema.groups.id, schema.members.groupId))
+          .where(
+            and(
+              eq(schema.members.userId, userId),
+              or(
+                sql`${schema.groups.completedAt} IS NULL`,
+                sql`${schema.groups.completedAt} > ${oneWeekAgo}`
+              )
             )
-          )
-        );
+          );
+      } catch (error) {
+        console.error("📦 storage.getAllGroups ERROR (memberGroupsResult):", error);
+        throw error;
+      }
       
       // Combine and deduplicate by group ID
       const allGroups = [...createdGroups, ...memberGroupsResult];
@@ -386,15 +405,20 @@ export class DbStorage implements IStorage {
       return uniqueGroups;
     }
     
-    return await db
-      .select()
-      .from(schema.groups)
-      .where(
-        or(
-          sql`${schema.groups.completedAt} IS NULL`,
-          sql`${schema.groups.completedAt} > ${oneWeekAgo}`
-        )
-      );
+    try {
+      return await db
+        .select()
+        .from(schema.groups)
+        .where(
+          or(
+            sql`${schema.groups.completedAt} IS NULL`,
+            sql`${schema.groups.completedAt} > ${oneWeekAgo}`
+          )
+        );
+    } catch (error) {
+      console.error("📦 storage.getAllGroups ERROR (no userId):", error);
+      throw error;
+    }
   }
 
   async getActiveGroups(): Promise<Group[]> {
@@ -478,32 +502,76 @@ export class DbStorage implements IStorage {
   }
 
   async getMembersByGroup(groupId: string): Promise<Member[]> {
-    const results = await db
-      .select({
-        id: schema.members.id,
-        groupId: schema.members.groupId,
-        userId: schema.members.userId,
-        name: schema.members.name,
-        phone: schema.members.phone,
-        avatar: schema.members.avatar,
-        joinDate: schema.members.joinDate,
-        status: schema.members.status,
-        role: schema.members.role,
-        isAdmin: schema.members.isAdmin,
-        canPostInGroup: schema.members.canPostInGroup,
-        rotationOrder: schema.members.rotationOrder,
-        preferredName: schema.users.preferredName,
-      })
-      .from(schema.members)
-      .leftJoin(schema.users, eq(schema.members.userId, schema.users.id))
-      .where(eq(schema.members.groupId, groupId))
-      .orderBy(schema.members.rotationOrder);
+    let results;
+    try {
+      results = await db
+        .select({
+          id: schema.members.id,
+          groupId: schema.members.groupId,
+          userId: schema.members.userId,
+          name: schema.members.name,
+          phone: schema.members.phone,
+          avatar: schema.members.avatar,
+          joinDate: schema.members.joinDate,
+          status: schema.members.status,
+          role: schema.members.role,
+          isAdmin: schema.members.isAdmin,
+          canPostInGroup: schema.members.canPostInGroup,
+          rotationOrder: schema.members.rotationOrder,
+          preferredName: schema.users.preferredName,
+          userEmail: schema.users.email,
+          userFirstName: schema.users.firstName,
+          userLastName: schema.users.lastName,
+          userProfileImageUrl: schema.users.profileImageUrl,
+          userPhone: schema.users.phone,
+          localBankName: schema.users.localBankName,
+          localBankAccountNumber: schema.users.localBankAccountNumber,
+          localBankAccountName: schema.users.localBankAccountName,
+          internationalBankAccountNumber: schema.users.internationalBankAccountNumber,
+          internationalBankAccountName: schema.users.internationalBankAccountName,
+        })
+        .from(schema.members)
+        .leftJoin(schema.users, eq(schema.members.userId, schema.users.id))
+        .where(eq(schema.members.groupId, groupId))
+        .orderBy(schema.members.rotationOrder);
+    } catch (error) {
+      console.error("📦 storage.getMembersByGroup ERROR:", error);
+      throw error;
+    }
 
     // Map results to include displayName (preferredName if available, otherwise name)
-    return results.map(result => ({
-      ...result,
-      displayName: result.preferredName || result.name,
-    })) as Member[];
+    return results.map(result => {
+      const user = result.userId ? {
+        id: result.userId,
+        email: result.userEmail,
+        firstName: result.userFirstName,
+        lastName: result.userLastName,
+        profileImageUrl: result.userProfileImageUrl,
+        phone: result.userPhone,
+        localBankName: result.localBankName,
+        localBankAccountNumber: result.localBankAccountNumber,
+        localBankAccountName: result.localBankAccountName,
+        internationalBankAccountNumber: result.internationalBankAccountNumber,
+        internationalBankAccountName: result.internationalBankAccountName,
+      } : undefined;
+
+      return {
+        id: result.id,
+        groupId: result.groupId,
+        userId: result.userId,
+        name: result.name,
+        phone: result.phone,
+        avatar: result.avatar,
+        joinDate: result.joinDate,
+        status: result.status,
+        role: result.role,
+        isAdmin: result.isAdmin,
+        canPostInGroup: result.canPostInGroup,
+        rotationOrder: result.rotationOrder,
+        displayName: result.preferredName || result.name,
+        user,
+      } as Member;
+    });
   }
 
   async getMemberByUserAndGroup(userId: string, groupId: string): Promise<Member | undefined> {

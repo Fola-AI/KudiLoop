@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { AppState, AppStateStatus, View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +11,7 @@ import { Button, Input, Divider } from "@/components/ui";
 import { colors } from "@/theme";
 import { safeAlert } from "@/utils/alertGate";
 import { secureStorage } from "@/services/secureStorage";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Required for OAuth to work properly
 WebBrowser.maybeCompleteAuthSession();
@@ -62,6 +63,7 @@ type VerificationFactorType = "first_factor" | "second_factor";
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const { startSSOFlow } = useSSO();
+  const { setIsAuthenticating } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,11 +71,26 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
+  const [isOAuthInProgress, setIsOAuthInProgress] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; code?: string; general?: string }>({});
   const [verificationStep, setVerificationStep] = useState<VerificationStep>("credentials");
   const [verificationMethod, setVerificationMethod] = useState<string>("");
   const [verificationFactorType, setVerificationFactorType] = useState<VerificationFactorType>("second_factor");
   const [resendSuccess, setResendSuccess] = useState(false);
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState: AppStateStatus) => {
+      if (isOAuthInProgress && __DEV__) {
+        console.log("🔐 OAuth in progress, preserving state:", nextAppState);
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isOAuthInProgress]);
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -358,6 +375,8 @@ export default function SignInScreen() {
     setSocialLoading(providerName);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
+    setIsOAuthInProgress(true);
+    setIsAuthenticating(true);
     try {
       const { createdSessionId, setActive: ssoSetActive } = await startSSOFlow({
         strategy,
@@ -384,9 +403,11 @@ export default function SignInScreen() {
         `Unable to sign in with ${providerName}. Please try again.`
       );
     } finally {
+      setIsOAuthInProgress(false);
+      setIsAuthenticating(false);
       setSocialLoading(null);
     }
-  }, [startSSOFlow]);
+  }, [startSSOFlow, setIsAuthenticating]);
 
   const handleForgotPassword = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

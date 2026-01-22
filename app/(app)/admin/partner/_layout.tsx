@@ -5,11 +5,16 @@ export default function PartnerFormLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.text,
+        headerBackTitle: "",
+        headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}
     />
   );
 }
+
 
 

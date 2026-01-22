@@ -35,11 +35,13 @@ export function useSessionTimeout(options?: {
   enabled?: boolean;
   onLock?: () => void;
   onTimeout?: () => void;
+  isAuthenticating?: boolean;
 }) {
   const {
     enabled = true,
     onLock,
     onTimeout,
+    isAuthenticating = false,
   } = options || {};
 
   const router = useRouter();
@@ -114,6 +116,9 @@ export function useSessionTimeout(options?: {
    * Register user activity to reset the inactivity timer
    */
   const registerActivity = useCallback(() => {
+    if (isAuthenticating) {
+      return;
+    }
     lastActivityTime.current = Date.now();
     
     // Clear and restart the inactivity timer
@@ -126,13 +131,30 @@ export function useSessionTimeout(options?: {
         await lockApp('inactivity');
       }, timeoutMs);
     }
-  }, [enabled, timeoutMs, isLocked, lockApp]);
+  }, [enabled, timeoutMs, isLocked, lockApp, isAuthenticating]);
 
   /**
    * Handle app state changes (foreground/background)
    */
   const handleAppStateChange = useCallback(async (nextAppState: AppStateStatus) => {
     if (!enabled) return;
+
+    if (isAuthenticating) {
+      if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
+        backgroundTime.current = Date.now();
+        if (inactivityTimer.current) {
+          clearTimeout(inactivityTimer.current);
+          inactivityTimer.current = null;
+        }
+      }
+
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        backgroundTime.current = null;
+      }
+
+      appState.current = nextAppState;
+      return;
+    }
 
     // App going to background
     if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
@@ -187,11 +209,12 @@ export function useSessionTimeout(options?: {
     }
 
     appState.current = nextAppState;
-  }, [enabled, timeoutMs, pathname, lockApp, forceSignOut, registerActivity]);
+  }, [enabled, timeoutMs, pathname, lockApp, forceSignOut, registerActivity, isAuthenticating]);
 
   // Set up app state listener
   useEffect(() => {
     if (!enabled) return;
+    if (isAuthenticating) return;
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     
@@ -214,14 +237,14 @@ export function useSessionTimeout(options?: {
         clearTimeout(inactivityTimer.current);
       }
     };
-  }, [enabled, handleAppStateChange, registerActivity, lockApp, pathname]);
+  }, [enabled, handleAppStateChange, registerActivity, lockApp, pathname, isAuthenticating]);
 
   // Reset activity on navigation changes
   useEffect(() => {
-    if (enabled && !pathname?.startsWith('/(auth)') && !isLocked) {
+    if (enabled && !pathname?.startsWith('/(auth)') && !isLocked && !isAuthenticating) {
       registerActivity();
     }
-  }, [pathname, enabled, isLocked, registerActivity]);
+  }, [pathname, enabled, isLocked, isAuthenticating, registerActivity]);
 
   /**
    * Manually reset the session timeout

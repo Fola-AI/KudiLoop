@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import * as ExpoSplashScreen from 'expo-splash-screen';
+import * as WebBrowser from 'expo-web-browser';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { UIReadyProvider } from '@/contexts/UIReadyContext';
 import { queryClient, asyncStoragePersister, PersistQueryClientProvider } from '@/services/queryClient';
@@ -39,6 +40,9 @@ LogBox.ignoreLogs([
 
 // Prevent auto-hide of native splash
 ExpoSplashScreen.preventAutoHideAsync();
+
+// Ensure OAuth sessions can complete on return
+WebBrowser.maybeCompleteAuthSession();
 
 // Fallback Clerk key from environment variable (for when backend is unreachable)
 const FALLBACK_CLERK_KEY = env.clerkPublishableKey;

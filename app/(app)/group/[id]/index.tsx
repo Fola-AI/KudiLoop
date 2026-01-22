@@ -73,6 +73,7 @@ function ContributionItem({
   contribution,
   isCurrentUser,
   isCurrentBeneficiary,
+  showReceivingBadge,
   groupId,
   hasAdminPrivileges,
   isProcessing,
@@ -85,6 +86,7 @@ function ContributionItem({
   contribution?: Contribution;
   isCurrentUser: boolean;
   isCurrentBeneficiary: boolean;
+  showReceivingBadge: boolean;
   groupId: string;
   hasAdminPrivileges: boolean;
   isProcessing: boolean;
@@ -105,9 +107,6 @@ function ContributionItem({
   const email = String(member.user?.email || '');
   const fullNameFromUser = `${firstName} ${lastName}`.trim();
   const memberName = directName || fullNameFromUser || email || 'Member';
-  
-  // Safely get rotation order (ensure it's a string or number, not an object)
-  const rotationOrder = typeof member.rotationOrder === 'number' ? member.rotationOrder : '?';
   
   // Safely check role (ensure strings)
   const memberRole = String(member.role || '');
@@ -190,15 +189,12 @@ function ContributionItem({
                 <Text style={{ fontSize: 10, color: "#14B8A6", fontWeight: "600" }}>Co-Admin</Text>
               </View>
             )}
-            {isCurrentBeneficiary && (
+            {isCurrentBeneficiary && showReceivingBadge && (
               <View style={{ marginLeft: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: "rgba(34,197,94,0.2)", borderRadius: 4 }}>
                 <Text style={{ fontSize: 10, color: colors.success.DEFAULT, fontWeight: "600" }}>Receiving</Text>
               </View>
             )}
           </View>
-          <Text style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }} numberOfLines={1}>
-            #{rotationOrder}
-          </Text>
         </View>
         
         {/* Status Icon */}
@@ -592,6 +588,28 @@ export default function GroupDetailScreen() {
   const membersList = members || group?.members || [];
   // Ensure contributions is always an array (API might return object or nested data)
   const contributionsList = Array.isArray(contributions) ? contributions : [];
+
+  // Calculate progress for the progress bar
+  const contributionAmount = group?.contributionAmount || 0;
+  const totalMembers = membersList.length || group?.memberCount || 0;
+  const totalPotThisCycle = contributionAmount * totalMembers;
+
+  // Count paid contributions for current cycle
+  const currentCycleContributions = contributionsList.filter(
+    (c: any) => c.cycle === group?.currentCycle
+  ) || [];
+
+  const paidCount = currentCycleContributions.filter(
+    (c: any) => c.status === 'paid'
+  ).length;
+
+  const collectedAmount = paidCount * contributionAmount;
+  const outstandingAmount = totalPotThisCycle - collectedAmount;
+  const progressPercentage = totalPotThisCycle > 0 
+    ? (collectedAmount / totalPotThisCycle) * 100 
+    : 0;
+
+  const currency = (group?.currency || 'NGN') as CurrencyCode;
   
   // Check if current user is Creator or Co-Admin with multiple fallback methods
   // IMPORTANT: This useMemo MUST be before any early returns to satisfy React's Rules of Hooks
@@ -700,11 +718,6 @@ export default function GroupDetailScreen() {
     );
   }
   
-  // Data already computed above early returns
-  const paidCount = contributionsList.filter(c => c.status === "paid" || c.status === "confirmed").length;
-  const totalPot = group.contributionAmount * membersList.length;
-  const currency = (group.currency || 'NGN') as CurrencyCode;
-  
   // Find current beneficiary - prefer currentBeneficiaryId, fallback to rotation order
   const findCurrentBeneficiary = () => {
     // First try to find by currentBeneficiaryId
@@ -744,7 +757,12 @@ export default function GroupDetailScreen() {
   // Visibility settings - admins always see everything
   // recipientVisibility: 0 = hidden, 1 = visible
   // scheduleVisibility: 0 = hidden, 1 = visible
-  const canSeeRecipient = hasAdminPrivileges || group.recipientVisibility !== 0;
+  const recipientVisibility = group.recipientVisibility;
+  const canSeeRecipient = hasAdminPrivileges
+    || recipientVisibility === 1
+    || recipientVisibility === true
+    || recipientVisibility === undefined
+    || recipientVisibility === null;
   const canSeeSchedule = hasAdminPrivileges || group.scheduleVisibility !== 0;
   
   // Calculate days until next collection (try both field names for compatibility)
@@ -834,11 +852,56 @@ export default function GroupDetailScreen() {
               total={group.totalCycles || membersList.length} 
             />
             
-            <View style={{ marginTop: 24, alignItems: "center" }}>
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>Total Pot This Cycle</Text>
-              <Text style={{ fontSize: 28, fontWeight: "700", color: colors.text, marginTop: 4 }}>
-                {formatCurrency(totalPot, currency)}
+            <View style={{ alignItems: 'center', marginVertical: 8 }}>
+              <Text style={{ color: '#A1A1AA', fontSize: 14 }}>
+                Total Pot This Cycle
               </Text>
+              <Text style={{ color: '#FAFAFA', fontSize: 32, fontWeight: '700', marginTop: 4 }}>
+                {formatCurrency(totalPotThisCycle, group?.currency)}
+              </Text>
+              
+              {/* === PROGRESS BAR - ADD THIS === */}
+              <View style={{ 
+                width: 280,
+                marginTop: 16,
+              }}>
+                {/* Bar background */}
+                <View style={{
+                  height: 10,
+                  backgroundColor: '#27272A',
+                  borderRadius: 5,
+                  overflow: 'hidden',
+                }}>
+                  {/* Bar fill */}
+                  <View style={{
+                    height: 10,
+                    width: `${Math.min(Math.max(progressPercentage, 0), 100)}%`,
+                    backgroundColor: '#22C55E',
+                    borderRadius: 5,
+                  }} />
+                </View>
+                
+                {/* Labels row */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  justifyContent: 'space-between',
+                  marginTop: 8,
+                }}>
+                  <View>
+                    <Text style={{ color: '#71717A', fontSize: 11 }}>collected</Text>
+                    <Text style={{ color: '#22C55E', fontSize: 14, fontWeight: '600' }}>
+                      {formatCurrency(collectedAmount, group?.currency)}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ color: '#71717A', fontSize: 11 }}>outstanding</Text>
+                    <Text style={{ color: '#EF4444', fontSize: 14, fontWeight: '600' }}>
+                      {formatCurrency(outstandingAmount, group?.currency)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              {/* === END PROGRESS BAR === */}
             </View>
           </View>
           
@@ -1144,6 +1207,7 @@ export default function GroupDetailScreen() {
                       contribution={contribution}
                       isCurrentUser={member.userId === currentUserId}
                       isCurrentBeneficiary={isMemberBeneficiary}
+                      showReceivingBadge={canSeeRecipient}
                       groupId={id || ''}
                       hasAdminPrivileges={hasAdminPrivileges}
                       isProcessing={isProcessing}

@@ -83,7 +83,7 @@ export default function JoinGroupScreen() {
   if (state === "loading") {
     return (
       <>
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen options={{ headerShown: true, headerTitle: "Group Invite" }} />
         <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
           <Animated.View entering={ZoomIn} style={{ alignItems: 'center' }}>
             <View style={{
@@ -130,7 +130,7 @@ export default function JoinGroupScreen() {
     
     return (
       <>
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen options={{ headerShown: true, headerTitle: "Group Invite" }} />
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
             <Animated.View entering={ZoomIn} style={{ alignItems: 'center' }}>
@@ -169,7 +169,7 @@ export default function JoinGroupScreen() {
   if (state === "already_member" && inviteData) {
     return (
       <>
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen options={{ headerShown: true, headerTitle: "Group Invite" }} />
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
             <Animated.View entering={ZoomIn} style={{ alignItems: 'center' }}>
@@ -211,7 +211,7 @@ export default function JoinGroupScreen() {
     
     return (
       <>
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen options={{ headerShown: true, headerTitle: "Group Invite" }} />
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingBottom: 120 }}>
             {/* Header */}
