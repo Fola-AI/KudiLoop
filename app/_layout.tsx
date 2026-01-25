@@ -20,6 +20,9 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { setAppReady as openAlertGate } from '@/utils/alertGate';
 import '../global.css';
 
+// Ensure OAuth sessions can complete on return
+WebBrowser.maybeCompleteAuthSession();
+
 // Suppress ALL LogBox errors and warnings - no error dialogs should show to users
 // This prevents the red error screen from appearing for non-fatal errors
 LogBox.ignoreAllLogs(true);
@@ -40,9 +43,6 @@ LogBox.ignoreLogs([
 
 // Prevent auto-hide of native splash
 ExpoSplashScreen.preventAutoHideAsync();
-
-// Ensure OAuth sessions can complete on return
-WebBrowser.maybeCompleteAuthSession();
 
 // Fallback Clerk key from environment variable (for when backend is unreachable)
 const FALLBACK_CLERK_KEY = env.clerkPublishableKey;

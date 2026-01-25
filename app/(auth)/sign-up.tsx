@@ -1,19 +1,38 @@
-import { useState, useCallback } from "react";
-import { View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { useState, useCallback, useEffect } from "react";
+import { View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useSignUp, useSSO } from "@clerk/clerk-expo";
 import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import * as LocalAuthentication from "expo-local-authentication";
 import { Button, Input, Divider } from "@/components/ui";
 import { colors } from "@/theme";
-import { safeAlert } from "@/utils/alertGate";
 import { secureStorage } from "@/services/secureStorage";
+import { queryClient } from "@/services/queryClient";
 
-// Required for OAuth to work properly
-WebBrowser.maybeCompleteAuthSession();
+// NOTE: WebBrowser.maybeCompleteAuthSession() is called in app/_layout.tsx
+// Do NOT call it here - multiple calls can cause OAuth issues
+
+/**
+ * Hook to warm up the browser for faster OAuth flows
+ * This pre-loads the browser process on Android and iOS
+ */
+function useWarmUpBrowser() {
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      // Warm up Chrome Custom Tabs for faster OAuth
+      void WebBrowser.warmUpAsync();
+    }
+    return () => {
+      if (Platform.OS === "android") {
+        void WebBrowser.coolDownAsync();
+      }
+    };
+  }, []);
+}
 
 /**
  * Check if user needs biometric/PIN setup and navigate accordingly
@@ -21,6 +40,11 @@ WebBrowser.maybeCompleteAuthSession();
  */
 async function navigateAfterAuth() {
   try {
+    // Clear any stale cached data from previous user sessions
+    // This prevents seeing another user's data after sign up
+    if (__DEV__) console.log('🔄 Clearing stale cache on sign up');
+    queryClient.clear();
+    
     // Check device capabilities
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -40,6 +64,9 @@ async function navigateAfterAuth() {
 }
 
 export default function SignUpScreen() {
+  // Warm up browser for faster OAuth - critical for in-app browser experience
+  useWarmUpBrowser();
+  
   const { signUp, setActive, isLoaded } = useSignUp();
   const { startSSOFlow } = useSSO();
   
@@ -160,7 +187,10 @@ export default function SignUpScreen() {
   };
 
   const handleSocialSignUp = useCallback(async (provider: "google" | "apple" | "oauth_google" | "oauth_apple") => {
-    if (!startSSOFlow) return;
+    if (!startSSOFlow) {
+      console.log("❌ startSSOFlow not available");
+      return;
+    }
 
     const strategy: "oauth_google" | "oauth_apple" =
       provider === "oauth_google" || provider === "oauth_apple"
@@ -173,36 +203,75 @@ export default function SignUpScreen() {
     setSocialLoading(providerName);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
+    // Create redirect URL
+    const redirectUrl = Linking.createURL("/oauth-callback");
+    
+    console.log("🔐 === OAUTH START ===");
+    console.log("🔐 Provider:", providerName);
+    console.log("🔐 Platform:", Platform.OS);
+    console.log("🔐 Redirect URL:", redirectUrl);
+    
     try {
-      const { createdSessionId, setActive: ssoSetActive } = await startSSOFlow({
+      // For Android, configure the browser to stay open
+      if (Platform.OS === "android") {
+        // Dismiss any existing browser sessions first
+        await WebBrowser.dismissBrowser();
+      }
+      
+      const { createdSessionId, setActive: ssoSetActive, signIn: ssoSignIn, signUp: ssoSignUp } = await startSSOFlow({
         strategy,
-        redirectUrl: "kudiloop://oauth-callback",
-        redirectUrlComplete: "kudiloop://oauth-callback",
+        redirectUrl,
+        redirectUrlComplete: redirectUrl,
       });
 
+      console.log("🔐 OAuth response received");
+      console.log("🔐 Session ID:", createdSessionId);
+      console.log("🔐 signIn:", !!ssoSignIn);
+      console.log("🔐 signUp:", !!ssoSignUp);
+
       if (createdSessionId && ssoSetActive) {
+        console.log("✅ Setting active session...");
         await ssoSetActive({ session: createdSessionId });
+        
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Check if this is returning user or new - navigate to biometric setup
+        
+        // Clear any stale cache
+        queryClient.clear();
+        
+        console.log("✅ Session activated, navigating...");
+        
+        // Give session time to propagate
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Navigate to biometric setup for new users
         await navigateAfterAuth();
+      } else {
+        console.log("⚠️ No session created - user may have cancelled");
       }
     } catch (err: any) {
-      if (__DEV__) console.log(`${providerName} sign up error:`, err);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      console.log("❌ OAuth ERROR:", err.message);
+      console.log("❌ Error code:", err.code);
+      console.log("❌ Error details:", JSON.stringify(err.errors || {}, null, 2));
       
       // Don't show error for user cancellation
-      if (err.message?.includes("cancelled") || err.message?.includes("canceled")) {
-        return;
-      }
+      const isCancelled = 
+        err.message?.toLowerCase().includes("cancel") ||
+        err.message?.toLowerCase().includes("closed") ||
+        err.message?.toLowerCase().includes("dismissed") ||
+        err.code === "ERR_CANCELED";
       
-      safeAlert(
-        "Sign Up Failed",
-        `Unable to sign up with ${providerName}. Please try again.`
-      );
+      if (!isCancelled) {
+        Alert.alert(
+          "Sign Up Failed",
+          `Unable to sign up with ${providerName}. Please try again.`,
+          [{ text: "OK" }]
+        );
+      }
     } finally {
+      console.log("🔐 === OAUTH END ===");
       setSocialLoading(null);
     }
-  }, [startSSOFlow]);
+  }, [startSSOFlow, navigateAfterAuth]);
 
   const clearError = (field: string) => {
     if (errors[field]) {

@@ -3,7 +3,7 @@
     "name": "KudiLoop",
     "slug": "kudiloop",
     "scheme": "kudiloop",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -19,7 +19,7 @@
       "newArchEnabled": true,
       "supportsTablet": false,
       "bundleIdentifier": "com.kudiloop.app",
-      "buildNumber": "12",
+      "buildNumber": "15",
       "infoPlist": {
         "NSCameraUsageDescription": "KudiLoop needs camera access to take photos of payment receipts.",
         "NSPhotoLibraryUsageDescription": "KudiLoop needs photo library access to upload payment receipts.",
@@ -46,7 +46,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.kudiloop.app",
-      "versionCode": 13,
+      "versionCode": 14,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -55,6 +55,23 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "kudiloop"
+            },
+            {
+              "scheme": "kudiloop",
+              "host": "*",
+              "pathPrefix": "/magic-link"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {
@@ -64,6 +81,7 @@
       "expo-router",
       "expo-secure-store",
       "expo-dev-client",
+      "expo-web-browser",
       [
         "expo-notifications",
         {

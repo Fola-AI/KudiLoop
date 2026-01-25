@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth as useClerkAuth, useUser as useClerkUser } from '@clerk/clerk-expo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setAuthToken, setTokenRefresher } from '@/services/api';
+import { queryClient } from '@/services/queryClient';
 import { User } from '@/types/api';
 import api from '@/services/api';
 
@@ -171,11 +173,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign out
   const handleSignOut = async () => {
     try {
+      if (__DEV__) console.log('🚪 Logging out - clearing cache');
+      
+      // Clear React Query memory cache BEFORE signing out
+      // This prevents stale data from appearing for the next user
+      queryClient.clear();
+      
+      // Clear persisted cache from AsyncStorage
+      // The key matches what's defined in services/queryClient.ts
+      await AsyncStorage.removeItem('kudiloop-query-cache');
+      
+      // Sign out from Clerk
       await clerkSignOut();
+      
+      // Reset local state
       setUser(null);
       setAuthToken(null);
       setUserError(null);
       hasFetchedRef.current = false;
+      
+      if (__DEV__) console.log('✅ Logout complete - cache cleared');
     } catch (error) {
       console.error('Sign out error:', error);
     }

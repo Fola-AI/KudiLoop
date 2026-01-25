@@ -2,9 +2,9 @@ import { View, Text, SectionList, Pressable, RefreshControl, ActivityIndicator }
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { colors } from "@/theme";
-import { formatCurrency } from "@/utils";
+import { formatCurrency, parseDate, formatActivityDate, getDateKey, getActivitySectionTitle, compareDates } from "@/utils";
 import { useRecentActivity } from "@/hooks/api";
 import { Button } from "@/components/ui";
 import type { CurrencyCode } from "@/types";
@@ -16,6 +16,23 @@ export default function ActivityScreen() {
   const { data: activities, isLoading, error, refetch } = useRecentActivity();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
+
+  useEffect(() => {
+    if (__DEV__) {
+      console.log("Recent activity payload:", activities);
+    }
+    // Debug logging to diagnose Invalid Date issue
+    if (activities && activities.length > 0 && __DEV__) {
+      console.log('=== ACTIVITY DEBUG ===');
+      console.log('First activity full object:', JSON.stringify(activities[0], null, 2));
+      console.log('createdAt:', activities[0].createdAt);
+      console.log('createdAt type:', typeof activities[0].createdAt);
+      // Use cross-platform parseDate instead of new Date()
+      console.log('Parsed date (cross-platform):', parseDate(activities[0].createdAt));
+      console.log('Formatted date:', formatActivityDate(activities[0].createdAt));
+      console.log('=== END DEBUG ===');
+    }
+  }, [activities]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -52,36 +69,29 @@ export default function ActivityScreen() {
       return true;
     });
 
-    // Group by date
-    const groups: { [key: string]: Activity[] } = {};
-    
-    filtered.forEach((activity) => {
-      const date = new Date(activity.createdAt);
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      
-      let dateKey: string;
-      if (date.toDateString() === today.toDateString()) {
-        dateKey = "Today";
-      } else if (date.toDateString() === yesterday.toDateString()) {
-        dateKey = "Yesterday";
+    // Use cross-platform date comparison for sorting
+    const sorted = [...filtered].sort(
+      (a, b) => compareDates(a.createdAt, b.createdAt)
+    );
+
+    const sections: { title: string; data: Activity[] }[] = [];
+    const sectionIndex = new Map<string, number>();
+
+    sorted.forEach((activity) => {
+      // Use cross-platform date utilities for grouping
+      const key = getDateKey(activity.createdAt);
+      const title = getActivitySectionTitle(activity.createdAt);
+
+      const existingIndex = sectionIndex.get(key);
+      if (existingIndex === undefined) {
+        sectionIndex.set(key, sections.length);
+        sections.push({ title, data: [activity] });
       } else {
-        dateKey = date.toLocaleDateString('en-US', { 
-          month: 'long', 
-          day: 'numeric', 
-          year: 'numeric' 
-        });
+        sections[existingIndex].data.push(activity);
       }
-      
-      if (!groups[dateKey]) {
-        groups[dateKey] = [];
-      }
-      groups[dateKey].push(activity);
     });
 
-    // Convert to sections array
-    return Object.entries(groups).map(([title, data]) => ({ title, data }));
+    return sections;
   }, [activities, filter]);
 
   // Calculate summary stats
@@ -358,11 +368,8 @@ function TransactionItem({
 
   const config = getConfig();
   const isPositive = config.prefix === "+";
-  const time = new Date(activity.createdAt).toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit', 
-    hour12: true 
-  });
+  // Use cross-platform date formatting
+  const activityTimestamp = formatActivityDate(activity.createdAt);
 
   return (
     <Pressable
@@ -413,7 +420,8 @@ function TransactionItem({
             )}
           </View>
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-            {activity.groupName || activity.potName || activity.description} · {time}
+            {activity.groupName || activity.potName || activity.description}
+            <Text style={{ color: "#A1A1AA" }}> · {activityTimestamp}</Text>
           </Text>
         </View>
         

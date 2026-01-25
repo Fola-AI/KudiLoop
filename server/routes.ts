@@ -1,12 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getAuth } from "@clerk/express";
+import { clerkClient } from "@clerk/clerk-sdk-node";
 import { storage } from "./storage";
 import { insertGroupSchema, insertMemberSchema, insertContributionSchema, updateUserProfileSchema, createInviteLinkDTOSchema, insertMessageSchema, type GroupCreateInput } from "@shared/schema";
 import * as schema from "@shared/schema";
 import { z } from "zod";
 import { setupClerkAuth, clerkAuthMiddleware, getOrCreateUserFromClerk } from "./clerkAuth";
 import { isInviteExpired, isInviteMaxedOut } from "./dateUtils";
+import { sendEmail } from "./utils/email";
 import multer from "multer";
 import * as path from "node:path";
 import * as fs from "node:fs";
@@ -119,12 +121,130 @@ function normalizeBoolean(value: unknown): 0 | 1 | null {
   return null;
 }
 
+const MAGIC_LINK_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const MAGIC_LINK_RATE_LIMIT_MAX = 3;
+const magicLinkRequestLog = new Map<string, number[]>();
+
+function isMagicLinkRateLimited(email: string): boolean {
+  const now = Date.now();
+  const timestamps = magicLinkRequestLog.get(email) || [];
+  const recent = timestamps.filter((timestamp) => now - timestamp < MAGIC_LINK_RATE_LIMIT_WINDOW_MS);
+
+  if (recent.length >= MAGIC_LINK_RATE_LIMIT_MAX) {
+    magicLinkRequestLog.set(email, recent);
+    return true;
+  }
+
+  recent.push(now);
+  magicLinkRequestLog.set(email, recent);
+  return false;
+}
+
 // Clerk authentication middleware (replaces JWT auth)
 const authMiddleware = clerkAuthMiddleware;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Clerk authentication routes
   setupClerkAuth(app);
+
+  // POST /api/auth/magic-link
+  // Sends a magic sign-in link to the user's email
+  app.post("/api/auth/magic-link", async (req, res) => {
+    const successResponse = {
+      success: true,
+      message: "If an account exists with this email, you will receive a sign-in link shortly.",
+    };
+
+    try {
+      console.log("🔗 Magic link request received");
+      console.log("🔗 Request body:", req.body);
+
+      const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+      console.log("🔗 Email:", email || "<missing>");
+      if (!email) {
+        return res.status(400).json({ message: "Email is required", error: "Email is required" });
+      }
+
+      const normalizedEmail = email.toLowerCase();
+      console.log("🔗 Normalized email:", normalizedEmail);
+
+      if (isMagicLinkRateLimited(normalizedEmail)) {
+        console.log("🔗 Rate limit exceeded for:", normalizedEmail);
+        return res.status(429).json({ message: "Too many requests. Please try again later.", error: "Too many requests. Please try again later." });
+      }
+
+      console.log("🔗 Clerk secret configured:", Boolean(process.env.CLERK_SECRET_KEY || process.env.CLERK_API_KEY));
+      console.log("🔗 SMTP configured:", Boolean(process.env.SMTP_USER && process.env.SMTP_PASS));
+
+      const user = await storage.getUserByEmail(normalizedEmail);
+      console.log("🔗 User lookup:", user ? "found" : "not found");
+      if (!user) {
+        return res.json(successResponse);
+      }
+
+      if (!user.clerkUserId) {
+        console.log("🔗 Missing clerk user ID for:", normalizedEmail);
+        return res.status(500).json({ message: "Failed to create magic link", error: "Failed to create magic link" });
+      }
+
+      console.log("🔗 Creating Clerk sign-in token for user:", user.clerkUserId);
+      const signInToken = await clerkClient.signInTokens.create({
+        userId: user.clerkUserId,
+        expiresInSeconds: 600,
+      });
+      console.log("🔗 Clerk sign-in token created");
+
+      const tokenValue = encodeURIComponent(signInToken.token);
+      const magicLink = `kudiloop://magic-link?token=${tokenValue}`;
+      const baseUrl = process.env.BASE_URL || process.env.APP_URL || "https://kudiloop.com";
+      const webFallbackLink = `${baseUrl}/magic-link?token=${tokenValue}`;
+
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #FF6B35;">Sign in to KudiLoop</h2>
+          <p>Use the link below to sign in. This link expires in 10 minutes.</p>
+          <p>
+            <a href="${magicLink}" style="display: inline-block; background-color: #FF6B35; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Sign in to KudiLoop</a>
+          </p>
+          <p style="color: #666; font-size: 14px;">If the button doesn't work, use this link:</p>
+          <p><a href="${webFallbackLink}">${webFallbackLink}</a></p>
+          <p style="color: #999; font-size: 12px;">If you didn't request this, you can ignore this email.</p>
+        </div>
+      `;
+
+      const text = [
+        "Sign in to KudiLoop",
+        "",
+        "Open this link to sign in (expires in 10 minutes):",
+        magicLink,
+        "",
+        "Web fallback:",
+        webFallbackLink,
+        "",
+        "If you didn't request this, you can ignore this email.",
+      ].join("\n");
+
+      await sendEmail({
+        to: normalizedEmail,
+        subject: "Sign in to KudiLoop",
+        html,
+        text,
+      });
+      console.log("🔗 Magic link email sent to:", normalizedEmail);
+
+      return res.json(successResponse);
+    } catch (error: any) {
+      console.error("[Magic Link] Failed to send sign-in link");
+      console.error("[Magic Link] Error:", error?.message || error);
+      if (error?.stack) {
+        console.error("[Magic Link] Stack:", error.stack);
+      }
+      if (error?.errors) {
+        console.error("[Magic Link] Clerk errors:", error.errors);
+      }
+      return res.status(500).json({ message: "Failed to send magic link", error: "Failed to send magic link" });
+    }
+  });
   
   // Helper function to check and update group go-live status
   async function checkAndUpdateGoLiveStatus(groupId: string) {
@@ -3374,27 +3494,25 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
       const userId = getUserId(req);
       const activities: any[] = [];
 
+      // Get recent activities (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
       // Get user's groups to filter relevant activities
       const userGroups = await storage.getAllGroups(userId);
       const groupIds = userGroups.map((g: any) => g.id);
 
-      if (groupIds.length === 0) {
-        return res.json([]);
-      }
+      // Process group-related activities if user has groups
+      if (groupIds.length > 0) {
+        // Fetch all members for all user's groups to get names
+        const allMembers = await Promise.all(
+          groupIds.map((groupId: string) => storage.getMembersByGroup(groupId))
+        );
+        const memberMap = new Map();
+        allMembers.flat().forEach((m: any) => memberMap.set(m.id, m));
 
-      // Get recent contributions (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      // Fetch all members for all user's groups to get names
-      const allMembers = await Promise.all(
-        groupIds.map((groupId: string) => storage.getMembersByGroup(groupId))
-      );
-      const memberMap = new Map();
-      allMembers.flat().forEach((m: any) => memberMap.set(m.id, m));
-
-      // Get recent paid contributions across all user's groups
-      for (const groupId of groupIds) {
+        // Get recent paid contributions across all user's groups
+        for (const groupId of groupIds) {
         const group = userGroups.find((g: any) => g.id === groupId);
         if (!group) continue;
 
@@ -3409,8 +3527,15 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
           const member = memberMap.get(c.memberId);
           // Only add if datePaid exists and is valid
           if (c.datePaid) {
-            const timestamp = typeof c.datePaid === 'string' ? c.datePaid : new Date(c.datePaid).toISOString();
-            const parsedDate = new Date(timestamp);
+            // Convert date-only strings (YYYY-MM-DD) to full ISO timestamps
+            let isoTimestamp: string;
+            if (typeof c.datePaid === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.datePaid)) {
+              // Date-only format: add time component (noon UTC to avoid timezone issues)
+              isoTimestamp = `${c.datePaid}T12:00:00.000Z`;
+            } else {
+              isoTimestamp = typeof c.datePaid === 'string' ? c.datePaid : new Date(c.datePaid).toISOString();
+            }
+            const parsedDate = new Date(isoTimestamp);
             if (!isNaN(parsedDate.getTime())) {
               const amount = typeof c.amount === 'number' ? c.amount : Number(c.amount);
               if (Number.isFinite(amount)) {
@@ -3421,7 +3546,7 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
                   description: `${member?.name || 'Member'} contributed to ${group.name} - Cycle ${c.cycle}`,
                   amount: amount,
                   currency: group.currency,
-                  timestamp: timestamp, // Ensure ISO string
+                  createdAt: isoTimestamp, // Full ISO timestamp
                   groupName: group.name,
                 });
               }
@@ -3444,25 +3569,64 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
         recentJoins.forEach(m => {
           // Only add if joinDate exists
           if (m.joinDate) {
-            const timestamp = typeof m.joinDate === 'string' ? m.joinDate : new Date(m.joinDate).toISOString();
-            const parsedDate = new Date(timestamp);
+            // Convert date-only strings (YYYY-MM-DD) to full ISO timestamps
+            let isoTimestamp: string;
+            if (typeof m.joinDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m.joinDate)) {
+              // Date-only format: add time component (noon UTC to avoid timezone issues)
+              isoTimestamp = `${m.joinDate}T12:00:00.000Z`;
+            } else {
+              isoTimestamp = typeof m.joinDate === 'string' ? m.joinDate : new Date(m.joinDate).toISOString();
+            }
+            const parsedDate = new Date(isoTimestamp);
             if (!isNaN(parsedDate.getTime())) {
               activities.push({
                 id: `join-${m.id}`,
-                type: 'join',
+                type: 'group_joined',
                 title: 'New Member Joined',
                 description: `${m.name} joined ${group.name}`,
-                timestamp: timestamp, // Ensure ISO string
+                createdAt: isoTimestamp, // Full ISO timestamp
                 groupName: group.name,
               });
             }
           }
         });
+        }
+      } // End of if (groupIds.length > 0)
+
+      // Get pot transactions (last 30 days)
+      const userPots = await storage.getSavingsPotsByUser(userId);
+      for (const pot of userPots) {
+        const transactions = await storage.getPotTransactions(pot.id);
+        const recentTransactions = transactions.filter(t => {
+          if (!t.createdAt) return false;
+          const txDate = new Date(t.createdAt);
+          return !isNaN(txDate.getTime()) && txDate > thirtyDaysAgo;
+        });
+
+        recentTransactions.forEach(t => {
+          const isoTimestamp = t.createdAt instanceof Date 
+            ? t.createdAt.toISOString() 
+            : typeof t.createdAt === 'string' 
+              ? t.createdAt 
+              : new Date(t.createdAt).toISOString();
+          
+          activities.push({
+            id: `pot-${t.id}`,
+            type: t.type === 'deposit' ? 'pot_deposit' : 'pot_withdrawal',
+            title: t.type === 'deposit' ? 'Pot Deposit' : 'Pot Withdrawal',
+            description: `${t.type === 'deposit' ? 'Added to' : 'Withdrew from'} ${pot.name}`,
+            amount: Number(t.amount),
+            currency: t.currency,
+            createdAt: isoTimestamp,
+            potName: pot.name,
+            potId: pot.id,
+          });
+        });
       }
 
-      // Sort by timestamp (most recent first) and limit to 10 items
-      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      const recentActivities = activities.slice(0, 10);
+      // Sort by createdAt (most recent first) and limit to 20 items
+      activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const recentActivities = activities.slice(0, 20);
 
       res.json(recentActivities);
     } catch (error) {

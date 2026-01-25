@@ -1,20 +1,40 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { AppState, AppStateStatus, View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { AppState, AppStateStatus, View, Text, Pressable, KeyboardAvoidingView, Platform, ScrollView, Alert, Modal, TextInput, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useSignIn, useSSO } from "@clerk/clerk-expo";
 import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import * as LocalAuthentication from "expo-local-authentication";
 import { Button, Input, Divider } from "@/components/ui";
 import { colors } from "@/theme";
-import { safeAlert } from "@/utils/alertGate";
 import { secureStorage } from "@/services/secureStorage";
+import { queryClient } from "@/services/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
+import api from "@/services/api";
 
-// Required for OAuth to work properly
-WebBrowser.maybeCompleteAuthSession();
+// NOTE: WebBrowser.maybeCompleteAuthSession() is called in app/_layout.tsx
+// Do NOT call it here - multiple calls can cause OAuth issues
+
+/**
+ * Hook to warm up the browser for faster OAuth flows
+ * This pre-loads the browser process on Android and iOS
+ */
+export function useWarmUpBrowser() {
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      // Warm up Chrome Custom Tabs for faster OAuth
+      void WebBrowser.warmUpAsync();
+    }
+    return () => {
+      if (Platform.OS === "android") {
+        void WebBrowser.coolDownAsync();
+      }
+    };
+  }, []);
+}
 
 /**
  * Check if user needs biometric/PIN setup and navigate accordingly
@@ -22,6 +42,11 @@ WebBrowser.maybeCompleteAuthSession();
  */
 async function navigateAfterAuth() {
   try {
+    // Clear any stale cached data from previous user sessions
+    // This prevents seeing another user's data after login
+    if (__DEV__) console.log('🔄 Clearing stale cache on login');
+    queryClient.clear();
+    
     // Check if biometric setup is already complete
     const setupComplete = await secureStorage.isBiometricSetupComplete();
     const hasBiometric = await secureStorage.isBiometricEnabled();
@@ -61,6 +86,9 @@ type VerificationStep = "credentials" | "email_code" | "phone_code" | "totp";
 type VerificationFactorType = "first_factor" | "second_factor";
 
 export default function SignInScreen() {
+  // Warm up browser for faster OAuth - critical for in-app browser experience
+  useWarmUpBrowser();
+  
   const { signIn, setActive, isLoaded } = useSignIn();
   const { startSSOFlow } = useSSO();
   const { setIsAuthenticating } = useAuth();
@@ -77,6 +105,11 @@ export default function SignInScreen() {
   const [verificationMethod, setVerificationMethod] = useState<string>("");
   const [verificationFactorType, setVerificationFactorType] = useState<VerificationFactorType>("second_factor");
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [showAlternativeMethod, setShowAlternativeMethod] = useState(false);
+  const [showMagicLinkModal, setShowMagicLinkModal] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
@@ -361,8 +394,48 @@ export default function SignInScreen() {
     }
   };
 
+  const resetMagicLinkModal = () => {
+    setShowMagicLinkModal(false);
+    setMagicLinkSent(false);
+    setMagicLinkEmail("");
+    setMagicLinkLoading(false);
+  };
+
+  const handleSendMagicLink = async () => {
+    if (!magicLinkEmail) {
+      Alert.alert("Error", "Please enter your email address");
+      return;
+    }
+    
+    setMagicLinkLoading(true);
+    
+    try {
+      const response = await api.post("/api/auth/magic-link", {
+        email: magicLinkEmail.trim().toLowerCase(),
+      });
+      
+      if (response.data.success) {
+        setMagicLinkSent(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Alert.alert("Error", response.data.error || "Failed to send sign-in link");
+      }
+    } catch (error: any) {
+      console.error("Magic link error:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.error || "Failed to send sign-in link. Please try again."
+      );
+    } finally {
+      setMagicLinkLoading(false);
+    }
+  };
+
   const handleSocialSignIn = useCallback(async (provider: "google" | "apple" | "oauth_google" | "oauth_apple") => {
-    if (!startSSOFlow) return;
+    if (!startSSOFlow) {
+      console.log("❌ startSSOFlow not available");
+      return;
+    }
 
     const strategy: "oauth_google" | "oauth_apple" =
       provider === "oauth_google" || provider === "oauth_apple"
@@ -377,37 +450,77 @@ export default function SignInScreen() {
     
     setIsOAuthInProgress(true);
     setIsAuthenticating(true);
+    
+    // Create redirect URL
+    const redirectUrl = Linking.createURL("/oauth-callback");
+    
+    console.log("🔐 === OAUTH START ===");
+    console.log("🔐 Provider:", providerName);
+    console.log("🔐 Platform:", Platform.OS);
+    console.log("🔐 Redirect URL:", redirectUrl);
+    
     try {
-      const { createdSessionId, setActive: ssoSetActive } = await startSSOFlow({
+      // For Android, configure the browser to stay open
+      if (Platform.OS === "android") {
+        // Dismiss any existing browser sessions first
+        await WebBrowser.dismissBrowser();
+      }
+      
+      const { createdSessionId, setActive: ssoSetActive, signIn: ssoSignIn, signUp: ssoSignUp } = await startSSOFlow({
         strategy,
-        redirectUrl: "kudiloop://oauth-callback",
-        redirectUrlComplete: "kudiloop://oauth-callback",
+        redirectUrl,
+        redirectUrlComplete: redirectUrl,
       });
 
+      console.log("🔐 OAuth response received");
+      console.log("🔐 Session ID:", createdSessionId);
+      console.log("🔐 signIn:", !!ssoSignIn);
+      console.log("🔐 signUp:", !!ssoSignUp);
+
       if (createdSessionId && ssoSetActive) {
+        console.log("✅ Setting active session...");
         await ssoSetActive({ session: createdSessionId });
+        
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        // Clear any stale cache
+        queryClient.clear();
+        
+        console.log("✅ Session activated, navigating...");
+        
+        // Give session time to propagate
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         await navigateAfterAuth();
+      } else {
+        console.log("⚠️ No session created - user may have cancelled");
       }
     } catch (err: any) {
-      if (__DEV__) console.log(`${providerName} sign in error:`, err);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      console.log("❌ OAuth ERROR:", err.message);
+      console.log("❌ Error code:", err.code);
+      console.log("❌ Error details:", JSON.stringify(err.errors || {}, null, 2));
       
       // Don't show error for user cancellation
-      if (err.message?.includes("cancelled") || err.message?.includes("canceled")) {
-        return;
-      }
+      const isCancelled = 
+        err.message?.toLowerCase().includes("cancel") ||
+        err.message?.toLowerCase().includes("closed") ||
+        err.message?.toLowerCase().includes("dismissed") ||
+        err.code === "ERR_CANCELED";
       
-      safeAlert(
-        "Sign In Failed",
-        `Unable to sign in with ${providerName}. Please try again.`
-      );
+      if (!isCancelled) {
+        Alert.alert(
+          "Sign In Failed",
+          `Unable to sign in with ${providerName}. Please try again or use email sign in.`,
+          [{ text: "OK" }]
+        );
+      }
     } finally {
+      console.log("🔐 === OAUTH END ===");
       setIsOAuthInProgress(false);
       setIsAuthenticating(false);
       setSocialLoading(null);
     }
-  }, [startSSOFlow, setIsAuthenticating]);
+  }, [startSSOFlow, setIsAuthenticating, navigateAfterAuth]);
 
   const handleForgotPassword = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -738,6 +851,34 @@ export default function SignInScreen() {
                   </Text>
                 </Pressable>
               </View>
+
+              {/* Show Alternative Sign-in on all platforms */}
+              <View style={styles.alternativeSection}>
+                <Pressable
+                  style={styles.alternativeHeader}
+                  onPress={() => setShowAlternativeMethod(!showAlternativeMethod)}
+                >
+                  <Ionicons
+                    name={showAlternativeMethod ? "chevron-down" : "chevron-forward"}
+                    size={20}
+                    color="#F97316"
+                  />
+                  <Text style={styles.alternativeHeaderText}>Alternative Sign-in method</Text>
+                </Pressable>
+
+                {showAlternativeMethod && (
+                  <View style={styles.alternativeContent}>
+                    <Pressable
+                      style={styles.emailLinkButton}
+                      onPress={() => setShowMagicLinkModal(true)}
+                    >
+                      <Ionicons name="mail-outline" size={20} color="#FFFFFF" />
+                      <Text style={styles.emailLinkButtonText}>Sign in with Email Link</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+              
             </View>
 
             {/* Sign Up Link */}
@@ -762,7 +903,193 @@ export default function SignInScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={showMagicLinkModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={resetMagicLinkModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={resetMagicLinkModal}>
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </Pressable>
+            <Text style={styles.modalTitle}>Sign in with Email Link</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          <View style={styles.modalContent}>
+            {magicLinkSent ? (
+              <View style={styles.successContainer}>
+                <Ionicons name="checkmark-circle" size={60} color="#22C55E" />
+                <Text style={styles.successTitle}>Check your email!</Text>
+                <Text style={styles.successText}>
+                  We've sent a sign-in link to {magicLinkEmail}
+                </Text>
+                <Text style={styles.successNote}>
+                  Click the link in the email to sign in. The link expires in 10 minutes.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.modalDescription}>
+                  Enter the email address associated with your account. We'll send you a link to sign in instantly.
+                </Text>
+
+                <View style={styles.inputContainer}>
+                  <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email address"
+                    placeholderTextColor="#6B7280"
+                    value={magicLinkEmail}
+                    onChangeText={setMagicLinkEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+
+                <Pressable
+                  style={[
+                    styles.sendLinkButton,
+                    (!magicLinkEmail || magicLinkLoading) && styles.sendLinkButtonDisabled,
+                  ]}
+                  onPress={handleSendMagicLink}
+                  disabled={!magicLinkEmail || magicLinkLoading}
+                >
+                  {magicLinkLoading ? (
+                    <ActivityIndicator color="#000000" />
+                  ) : (
+                    <Text style={styles.sendLinkButtonText}>Send Sign-in Link</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  alternativeSection: {
+    marginTop: 24,
+    width: "100%",
+  },
+  alternativeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  alternativeHeaderText: {
+    color: "#F97316",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  alternativeContent: {
+    marginTop: 8,
+  },
+  emailLinkButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1F1F1F",
+    borderRadius: 8,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  emailLinkButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#0A0A0A",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1F1F1F",
+  },
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  modalContent: {
+    flex: 1,
+    padding: 24,
+  },
+  modalDescription: {
+    color: "#A1A1AA",
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 32,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1F1F1F",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 16,
+    paddingVertical: 16,
+  },
+  sendLinkButton: {
+    backgroundColor: "#22C55E",
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  sendLinkButtonDisabled: {
+    opacity: 0.5,
+  },
+  sendLinkButtonText: {
+    color: "#000000",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  successContainer: {
+    alignItems: "center",
+    paddingTop: 40,
+  },
+  successTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "600",
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  successText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    textAlign: "center",
+  },
+  successNote: {
+    color: "#A1A1AA",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 16,
+    lineHeight: 20,
+  },
+});
 
