@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { useSignIn } from "@clerk/clerk-expo";
+import { useAuth, useSignIn } from "@clerk/clerk-expo";
 import { Button } from "@/components/ui";
 import { queryClient } from "@/services/queryClient";
 
@@ -9,7 +9,9 @@ type StatusState = "loading" | "success" | "error";
 
 export default function MagicLinkScreen() {
   const params = useLocalSearchParams();
-  const { signIn, setActive, isLoaded } = useSignIn();
+  const { signIn, setActive, isLoaded: isSignInLoaded } = useSignIn();
+  const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
+  const isSignedInRef = useRef(isSignedIn);
 
   const token = useMemo(() => {
     const tokenParam = params.token;
@@ -26,7 +28,20 @@ export default function MagicLinkScreen() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    if (!isLoaded) return;
+    isSignedInRef.current = isSignedIn;
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    if (!isAuthLoaded) return;
+    if (isSignedIn) {
+      queryClient.clear();
+      router.replace("/(app)/(tabs)");
+    }
+  }, [isAuthLoaded, isSignedIn]);
+
+  useEffect(() => {
+    if (!isSignInLoaded || !isAuthLoaded) return;
+    if (isSignedIn) return;
 
     if (!token) {
       setStatus("error");
@@ -42,6 +57,18 @@ export default function MagicLinkScreen() {
 
     let isActive = true;
     let navigateTimer: ReturnType<typeof setTimeout> | null = null;
+    let errorTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleError = (message: string) => {
+      if (!isActive) return;
+      errorTimer = setTimeout(() => {
+        if (!isActive) return;
+        if (!isSignedInRef.current) {
+          setStatus("error");
+          setErrorMessage(message);
+        }
+      }, 1200);
+    };
 
     const authenticate = async () => {
       try {
@@ -66,19 +93,15 @@ export default function MagicLinkScreen() {
             }
           }, 800);
         } else {
-          if (!isActive) return;
-          setStatus("error");
-          setErrorMessage("Unable to complete sign in. Please try again.");
+          scheduleError("Unable to complete sign in. Please try again.");
         }
       } catch (err: any) {
-        if (!isActive) return;
         const message =
           err?.errors?.[0]?.message ||
           err?.errors?.[0]?.longMessage ||
           err?.message ||
           "Unable to sign in with this link.";
-        setStatus("error");
-        setErrorMessage(message);
+        scheduleError(message);
       }
     };
 
@@ -87,10 +110,20 @@ export default function MagicLinkScreen() {
     return () => {
       isActive = false;
       if (navigateTimer) clearTimeout(navigateTimer);
+      if (errorTimer) clearTimeout(errorTimer);
     };
-  }, [isLoaded, signIn, setActive, token]);
+  }, [isAuthLoaded, isSignInLoaded, isSignedIn, signIn, setActive, token]);
 
   const renderContent = () => {
+    if (isAuthLoaded && isSignedIn) {
+      return (
+        <>
+          <Text style={[styles.title, styles.successText]}>Success!</Text>
+          <Text style={styles.subtext}>Redirecting you to the app...</Text>
+        </>
+      );
+    }
+
     if (status === "success") {
       return (
         <>

@@ -121,8 +121,8 @@ function normalizeBoolean(value: unknown): 0 | 1 | null {
   return null;
 }
 
-const MAGIC_LINK_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
-const MAGIC_LINK_RATE_LIMIT_MAX = 3;
+const MAGIC_LINK_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const MAGIC_LINK_RATE_LIMIT_MAX = 10;
 const magicLinkRequestLog = new Map<string, number[]>();
 
 function isMagicLinkRateLimited(email: string): boolean {
@@ -188,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("🔗 Creating Clerk sign-in token for user:", user.clerkUserId);
-      const signInToken = await clerkClient.signInTokens.create({
+      const signInToken = await clerkClient.signInTokens.createSignInToken({
         userId: user.clerkUserId,
         expiresInSeconds: 600,
       });
@@ -196,18 +196,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const tokenValue = encodeURIComponent(signInToken.token);
       const magicLink = `kudiloop://magic-link?token=${tokenValue}`;
-      const baseUrl = process.env.BASE_URL || process.env.APP_URL || "https://kudiloop.com";
-      const webFallbackLink = `${baseUrl}/magic-link?token=${tokenValue}`;
+      // Use the same deep link for fallback - no web fallback needed for mobile app
+      const webFallbackLink = magicLink;
 
       const html = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #FF6B35;">Sign in to KudiLoop</h2>
-          <p>Use the link below to sign in. This link expires in 10 minutes.</p>
+          <p>Use the button below to sign in. This link expires in 10 minutes.</p>
           <p>
             <a href="${magicLink}" style="display: inline-block; background-color: #FF6B35; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Sign in to KudiLoop</a>
           </p>
-          <p style="color: #666; font-size: 14px;">If the button doesn't work, use this link:</p>
-          <p><a href="${webFallbackLink}">${webFallbackLink}</a></p>
+          <p style="color: #666; font-size: 14px;">If the button doesn't work, copy and paste this link into your mobile browser:</p>
+          <p style="word-break: break-all;"><a href="${webFallbackLink}">${webFallbackLink}</a></p>
           <p style="color: #999; font-size: 12px;">If you didn't request this, you can ignore this email.</p>
         </div>
       `;
@@ -217,9 +217,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "",
         "Open this link to sign in (expires in 10 minutes):",
         magicLink,
-        "",
-        "Web fallback:",
-        webFallbackLink,
         "",
         "If you didn't request this, you can ignore this email.",
       ].join("\n");

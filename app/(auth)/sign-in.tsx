@@ -410,7 +410,7 @@ export default function SignInScreen() {
     setMagicLinkLoading(true);
     
     try {
-      const response = await api.post("/api/auth/magic-link", {
+      const response = await api.post("/auth/magic-link", {
         email: magicLinkEmail.trim().toLowerCase(),
       });
       
