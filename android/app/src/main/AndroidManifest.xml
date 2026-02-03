@@ -42,6 +42,7 @@
         <action android:name="android.intent.action.VIEW"/>
         <data android:scheme="kudiloop"/>
         <data android:scheme="kudiloop" android:host="*" android:pathPrefix="/magic-link"/>
+        <data android:scheme="kudiloop" android:host="*" android:pathPrefix="/join"/>
         <data android:scheme="exp+kudiloop"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>

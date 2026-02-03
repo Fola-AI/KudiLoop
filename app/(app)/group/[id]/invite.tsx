@@ -14,6 +14,18 @@ import { useGroup, useGroupInvites, useCreateInvite, useDeleteInvite } from "@/h
 import type { InviteLink } from "@/types/api";
 
 const BASE_URL = "https://kudiloop.com";
+const APP_SCHEME = "kudiloop";
+
+const getInviteLinks = (token: string) => {
+  const appLink = `${APP_SCHEME}://join/${token}`;
+  const webLink = `${BASE_URL}/join/${token}`;
+  return { appLink, webLink };
+};
+
+const getShareMessage = (groupName: string, token: string) => {
+  const { webLink } = getInviteLinks(token);
+  return `Join my savings group "${groupName}" on KudiLoop!\n\n${webLink}`;
+};
 
 // Create Invite Modal
 function CreateInviteModal({
@@ -234,7 +246,6 @@ function InviteCard({
   onCopy: () => void;
   onRevoke: () => void;
 }) {
-  const inviteUrl = `${BASE_URL}/invite/${invite.token}`;
   const isExpired = invite.expiresAt ? new Date(invite.expiresAt) < new Date() : false;
   const isUsedUp = invite.maxUses !== undefined && invite.usedCount >= invite.maxUses;
   const isActive = !isExpired && !isUsedUp;
@@ -416,7 +427,8 @@ export default function InviteScreen() {
       
       // Show QR code for the new invite
       if (result?.token) {
-        setSelectedInviteUrl(`${BASE_URL}/invite/${result.token}`);
+        const inviteLinks = getInviteLinks(result.token);
+        setSelectedInviteUrl(inviteLinks.webLink);
         setShowQRModal(true);
       }
       
@@ -428,13 +440,13 @@ export default function InviteScreen() {
   };
   
   const handleShare = async (token: string) => {
-    const inviteUrl = `${BASE_URL}/invite/${token}`;
-    const message = `Join my savings group "${group.name}" on KudiLoop!\n\n${inviteUrl}`;
+    const inviteLinks = getInviteLinks(token);
+    const message = getShareMessage(group.name, token);
     
     try {
       await Share.share({
         message,
-        url: inviteUrl,
+        url: inviteLinks.webLink,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
@@ -443,8 +455,8 @@ export default function InviteScreen() {
   };
   
   const handleCopy = async (token: string) => {
-    const inviteUrl = `${BASE_URL}/invite/${token}`;
-    await Clipboard.setStringAsync(inviteUrl);
+    const inviteLinks = getInviteLinks(token);
+    await Clipboard.setStringAsync(inviteLinks.webLink);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     safeAlert("Copied!", "Invite link copied to clipboard");
   };
@@ -548,7 +560,8 @@ export default function InviteScreen() {
                   invite={invite}
                   groupName={group.name}
                   onShowQR={() => {
-                    setSelectedInviteUrl(`${BASE_URL}/invite/${invite.token}`);
+                    const inviteLinks = getInviteLinks(invite.token);
+                    setSelectedInviteUrl(inviteLinks.webLink);
                     setShowQRModal(true);
                   }}
                   onShare={() => handleShare(invite.token)}

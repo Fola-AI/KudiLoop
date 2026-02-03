@@ -20,6 +20,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.kudiloop.app",
       "buildNumber": "15",
+      "associatedDomains": [
+        "applinks:kudiloop.com",
+        "applinks:www.kudiloop.com"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "KudiLoop needs camera access to take photos of payment receipts.",
         "NSPhotoLibraryUsageDescription": "KudiLoop needs photo library access to upload payment receipts.",
@@ -59,15 +63,27 @@
       "intentFilters": [
         {
           "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "kudiloop.com",
+              "pathPrefix": "/join"
+            },
+            {
+              "scheme": "https",
+              "host": "www.kudiloop.com",
+              "pathPrefix": "/join"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
           "autoVerify": false,
           "data": [
             {
               "scheme": "kudiloop"
-            },
-            {
-              "scheme": "kudiloop",
-              "host": "*",
-              "pathPrefix": "/magic-link"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]

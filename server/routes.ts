@@ -147,6 +147,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Clerk authentication routes
   setupClerkAuth(app);
 
+  // Apple App Site Association - Required for Universal Links
+  // Must be served at: https://kudiloop.com/.well-known/apple-app-site-association
+  app.get("/.well-known/apple-app-site-association", (req, res) => {
+    const appSiteAssociation = {
+      applinks: {
+        apps: [],
+        details: [
+          {
+            appID: "7WQ97NM6W7.com.kudiloop.app",
+            paths: ["/join/*", "/invite/*", "/magic-link*"],
+          },
+        ],
+      },
+    };
+
+    res.setHeader("Content-Type", "application/json");
+    res.json(appSiteAssociation);
+  });
+
+  // Android Asset Links - Required for App Links
+  // Must be served at: https://kudiloop.com/.well-known/assetlinks.json
+  app.get("/.well-known/assetlinks.json", (req, res) => {
+    const assetLinks = [
+      {
+        relation: ["delegate_permission/common.handle_all_urls"],
+        target: {
+          namespace: "android_app",
+          package_name: "com.kudiloop.app",
+          sha256_cert_fingerprints: [
+            "61:3D:18:DF:4D:C6:2E:DC:BC:E7:09:80:E0:77:0D:A4:9D:57:54:66:BA:10:3E:DC:EC:54:B2:8E:15:4A:A7:BC",
+          ],
+        },
+      },
+    ];
+
+    res.setHeader("Content-Type", "application/json");
+    res.json(assetLinks);
+  });
+
+  // Fallback page for users without the app installed
+  app.get("/join/:token", (req, res) => {
+    const { token } = req.params;
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Group - KudiLoop</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #0a0a0a;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 { color: #FF6B35; margin-bottom: 16px; }
+    p { color: #9ca3af; margin-bottom: 32px; }
+    .buttons { display: flex; flex-direction: column; gap: 12px; }
+    a {
+      background: #FF6B35;
+      color: white;
+      padding: 16px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    a.secondary {
+      background: #1f2937;
+    }
+  </style>
+  <script>
+    window.location.href = 'kudiloop://join/${token}';
+    setTimeout(() => {
+      document.getElementById('fallback').style.display = 'flex';
+    }, 2000);
+  </script>
+</head>
+<body>
+  <div id="fallback" style="display: none; flex-direction: column; align-items: center;">
+    <h1>KudiLoop</h1>
+    <p>You've been invited to join a savings group!</p>
+    <p>Download the app to get started:</p>
+    <div class="buttons">
+      <a href="https://apps.apple.com/app/id6756009015">Download on App Store</a>
+      <a href="https://play.google.com/store/apps/details?id=com.kudiloop.app" class="secondary">Get it on Google Play</a>
+    </div>
+  </div>
+  <noscript>
+    <h1>KudiLoop</h1>
+    <p>Download the app to join this savings group:</p>
+    <a href="https://apps.apple.com/app/id6756009015">App Store</a>
+    <a href="https://play.google.com/store/apps/details?id=com.kudiloop.app">Google Play</a>
+  </noscript>
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html");
+    res.send(html);
+  });
+
   // POST /api/auth/magic-link
   // Sends a magic sign-in link to the user's email
   app.post("/api/auth/magic-link", async (req, res) => {

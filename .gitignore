@@ -25,6 +25,9 @@ android/app/build/
 android/build/
 *.apk
 *.aab
+android/keystore.properties
+android/app/kudiloop-release.keystore
+credentials.json
 
 # Metro
 .metro-health-check*
