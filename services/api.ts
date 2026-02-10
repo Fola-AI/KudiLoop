@@ -38,6 +38,7 @@ const api: AxiosInstance = axios.create({
     'X-Platform': 'mobile',
   },
 });
+console.log('🌐 API Base URL:', config.apiUrl);
 
 // Token storage
 let authToken: string | null = null;

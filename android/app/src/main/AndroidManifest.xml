@@ -38,11 +38,16 @@
         <data android:scheme="kudiloop"/>
         <data android:scheme="exp+kudiloop"/>
       </intent-filter>
+      <intent-filter android:autoVerify="true" data-generated="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <data android:scheme="https" android:host="kudiloop.com" android:pathPrefix="/join"/>
+        <data android:scheme="https" android:host="www.kudiloop.com" android:pathPrefix="/join"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
       <intent-filter data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
         <data android:scheme="kudiloop"/>
-        <data android:scheme="kudiloop" android:host="*" android:pathPrefix="/magic-link"/>
-        <data android:scheme="kudiloop" android:host="*" android:pathPrefix="/join"/>
         <data android:scheme="exp+kudiloop"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>

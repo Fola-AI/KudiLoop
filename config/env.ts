@@ -37,7 +37,7 @@ const getEnvironment = (): Environment => {
 // - iOS Simulator: http://localhost:3000 works
 // - Android Emulator: use http://10.0.2.2:3000 (emulator's host loopback)
 // - Physical devices: use your machine's IP, e.g., http://192.168.x.x:3000
-const API_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? 'http://192.168.1.165:3000' : 'https://kudiloop.onrender.com');
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://kudiloop.com';
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
 const CLOUDINARY_CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dv5up7vpe';
 const CLOUDINARY_UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'kudiloop_receipts';
@@ -54,7 +54,7 @@ const configs: Record<Environment, EnvironmentConfig> = {
     apiTimeoutMs: 30000,
   },
   staging: {
-    apiUrl: process.env.EXPO_PUBLIC_STAGING_API_URL || 'https://kudiloop.onrender.com',
+    apiUrl: process.env.EXPO_PUBLIC_STAGING_API_URL || 'https://kudiloop.com',
     clerkPublishableKey: CLERK_PUBLISHABLE_KEY,
     cloudinaryCloudName: CLOUDINARY_CLOUD_NAME,
     cloudinaryUploadPreset: CLOUDINARY_UPLOAD_PRESET,
@@ -64,7 +64,7 @@ const configs: Record<Environment, EnvironmentConfig> = {
     apiTimeoutMs: 30000,
   },
   production: {
-    apiUrl: 'https://kudiloop.onrender.com',
+    apiUrl: 'https://kudiloop.com',
     clerkPublishableKey: CLERK_PUBLISHABLE_KEY,
     cloudinaryCloudName: CLOUDINARY_CLOUD_NAME,
     cloudinaryUploadPreset: CLOUDINARY_UPLOAD_PRESET,

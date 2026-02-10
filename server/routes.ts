@@ -1689,7 +1689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Delete member from group
+  // Admin: Delete member from group OR member leaves
   app.delete("/api/groups/:groupId/members/:memberId", authMiddleware, async (req: any, res) => {
     try {
       const userId = getUserId(req);
@@ -1701,27 +1701,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Group not found" });
       }
       
-      // CRITICAL: Verify the authenticated user is the actual group owner (via group.userId)
-      if (group.userId !== userId) {
-        return res.status(403).json({ error: "Only the group creator can remove members" });
-      }
-      
-      // Get members to verify target member exists
+      // Get members
       const members = await storage.getMembersByGroup(groupId);
       const currentUserMember = members.find(m => m.userId === userId);
-      if (!currentUserMember || currentUserMember.role !== 'creator') {
-        return res.status(403).json({ error: "Only the group creator can remove members" });
-      }
-      
-      // Verify the target member exists in this group
       const targetMember = members.find(m => m.id === memberId);
+      
       if (!targetMember) {
         return res.status(404).json({ error: "Member not found" });
       }
       
-      // Prevent creator from removing themselves
-      if (targetMember.userId === userId) {
-        return res.status(400).json({ error: "Cannot remove yourself from the group" });
+      const isCreator = group.userId === userId;
+      const isSelfLeaving = targetMember.userId === userId;
+      
+      // Check if group is live (goLiveDate has passed)
+      const isGroupLive = group.goLiveDate && new Date(group.goLiveDate) <= new Date();
+      
+      // Case 1: Member trying to leave themselves
+      if (isSelfLeaving) {
+        // Creator cannot leave their own group
+        if (isCreator) {
+          return res.status(400).json({ error: "Group creator cannot leave the group" });
+        }
+        
+        // Participants can only leave before group goes live
+        if (isGroupLive) {
+          return res.status(400).json({ error: "Cannot leave group after it has gone live" });
+        }
+        
+        // Allow participant to leave
+        const success = await storage.deleteMember(memberId, groupId);
+        if (!success) {
+          return res.status(404).json({ error: "Failed to leave group" });
+        }
+        return res.status(204).send();
+      }
+      
+      // Case 2: Creator removing another member
+      if (!isCreator) {
+        return res.status(403).json({ error: "Only the group creator can remove other members" });
       }
       
       const success = await storage.deleteMember(memberId, groupId);
@@ -1731,6 +1748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(204).send();
     } catch (error) {
+      console.error("Error removing member:", error);
       res.status(500).json({ error: "Failed to remove member" });
     }
   });
@@ -2771,15 +2789,17 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
         return res.status(410).json({ error: "This group has been completed and is no longer accepting new members" });
       }
       
+      // Get members
+      const members = await storage.getMembersByGroup(group.id);
+      
       // Check if user is already a member
-      const existingMembers = await storage.getMembersByGroup(group.id);
-      const userAlreadyMember = existingMembers.some(m => m.userId === userId);
-      if (userAlreadyMember) {
-        return res.status(409).json({ error: "You are already a member of this group" });
+      const existingMember = members.find(m => m.userId === userId);
+      if (existingMember) {
+        return res.status(400).json({ error: "You are already a member of this group" });
       }
       
       // Get next rotation order
-      const maxRotationOrder = Math.max(...existingMembers.map(m => m.rotationOrder), 0);
+      const maxRotationOrder = Math.max(...members.map(m => m.rotationOrder), 0);
       
       // Create member
       const member = await storage.createMember({

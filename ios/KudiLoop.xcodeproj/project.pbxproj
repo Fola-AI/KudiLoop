@@ -8,28 +8,28 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		20F34DDAC8D2B513EA5067FC /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F0C86F97B6DBEAD3282249 /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		A5A015C5201A9DAB851ABDEE /* libPods-KudiLoop.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FE3BCCB98C1F7071437C7C91 /* libPods-KudiLoop.a */; };
-		AD771282291185D65D051B1C /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF58082914448194B1562A1 /* ExpoModulesProvider.swift */; };
+		5343BF4FAB6BAB4FD4B514E7 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D5FC2349F8F9BBECE4883A53 /* PrivacyInfo.xcprivacy */; };
+		9827AC7E8FA75517D12C17A2 /* libPods-KudiLoop.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CF4A0D52AF7E413A4A66FF92 /* libPods-KudiLoop.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F912D1902A0BD65E7F7D9CFC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FA5B7BA0BD29FF97EA9689E4 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		07F0C86F97B6DBEAD3282249 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-KudiLoop/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* KudiLoop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KudiLoop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = KudiLoop/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = KudiLoop/Info.plist; sourceTree = "<group>"; };
-		13B1505655415E87265E3DAC /* Pods-KudiLoop.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KudiLoop.release.xcconfig"; path = "Target Support Files/Pods-KudiLoop/Pods-KudiLoop.release.xcconfig"; sourceTree = "<group>"; };
-		4CD722F2D31B39DB58ECCD4A /* Pods-KudiLoop.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KudiLoop.debug.xcconfig"; path = "Target Support Files/Pods-KudiLoop/Pods-KudiLoop.debug.xcconfig"; sourceTree = "<group>"; };
-		8AF58082914448194B1562A1 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-KudiLoop/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		8A19FAFCEEC9A4D969E10259 /* Pods-KudiLoop.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KudiLoop.release.xcconfig"; path = "Target Support Files/Pods-KudiLoop/Pods-KudiLoop.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = KudiLoop/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		CF4A0D52AF7E413A4A66FF92 /* libPods-KudiLoop.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-KudiLoop.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D5FC2349F8F9BBECE4883A53 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = KudiLoop/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		E1DBE88DD4E72D6C7EF2FCD5 /* Pods-KudiLoop.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KudiLoop.debug.xcconfig"; path = "Target Support Files/Pods-KudiLoop/Pods-KudiLoop.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = KudiLoop/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* KudiLoop-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "KudiLoop-Bridging-Header.h"; path = "KudiLoop/KudiLoop-Bridging-Header.h"; sourceTree = "<group>"; };
-		FA5B7BA0BD29FF97EA9689E4 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = KudiLoop/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		FE3BCCB98C1F7071437C7C91 /* libPods-KudiLoop.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-KudiLoop.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,13 +37,29 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A5A015C5201A9DAB851ABDEE /* libPods-KudiLoop.a in Frameworks */,
+				9827AC7E8FA75517D12C17A2 /* libPods-KudiLoop.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		00C487EAEA90658481048C68 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				07C133B0492802DB168100F3 /* KudiLoop */,
+			);
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
+		07C133B0492802DB168100F3 /* KudiLoop */ = {
+			isa = PBXGroup;
+			children = (
+				07F0C86F97B6DBEAD3282249 /* ExpoModulesProvider.swift */,
+			);
+			name = KudiLoop;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* KudiLoop */ = {
 			isa = PBXGroup;
 			children = (
@@ -53,26 +69,16 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				FA5B7BA0BD29FF97EA9689E4 /* PrivacyInfo.xcprivacy */,
+				D5FC2349F8F9BBECE4883A53 /* PrivacyInfo.xcprivacy */,
 			);
 			name = KudiLoop;
-			sourceTree = "<group>";
-		};
-		2ABD69C5A3D58295BA59E0DD /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				4CD722F2D31B39DB58ECCD4A /* Pods-KudiLoop.debug.xcconfig */,
-				13B1505655415E87265E3DAC /* Pods-KudiLoop.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				FE3BCCB98C1F7071437C7C91 /* libPods-KudiLoop.a */,
+				CF4A0D52AF7E413A4A66FF92 /* libPods-KudiLoop.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -84,6 +90,16 @@
 			name = Libraries;
 			sourceTree = "<group>";
 		};
+		834A5B159C5E83BD19E1D3C2 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				E1DBE88DD4E72D6C7EF2FCD5 /* Pods-KudiLoop.debug.xcconfig */,
+				8A19FAFCEEC9A4D969E10259 /* Pods-KudiLoop.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
@@ -91,8 +107,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				2ABD69C5A3D58295BA59E0DD /* Pods */,
-				E578C4EAC3B022F173D6AC9F /* ExpoModulesProviders */,
+				834A5B159C5E83BD19E1D3C2 /* Pods */,
+				00C487EAEA90658481048C68 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -107,14 +123,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B985D608800493C3FFD259CE /* KudiLoop */ = {
-			isa = PBXGroup;
-			children = (
-				8AF58082914448194B1562A1 /* ExpoModulesProvider.swift */,
-			);
-			name = KudiLoop;
-			sourceTree = "<group>";
-		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
@@ -122,14 +130,6 @@
 			);
 			name = Supporting;
 			path = KudiLoop/Supporting;
-			sourceTree = "<group>";
-		};
-		E578C4EAC3B022F173D6AC9F /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				B985D608800493C3FFD259CE /* KudiLoop */,
-			);
-			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "KudiLoop" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				C1556103629B09E01BE36F34 /* [Expo] Configure project */,
+				F24A57064A07865141E8B50E /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				FED7FF9C444C87EB1C2F7A71 /* [CP] Embed Pods Frameworks */,
+				11DE2B1A37C063FF2E1AF043 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				F912D1902A0BD65E7F7D9CFC /* PrivacyInfo.xcprivacy in Resources */,
+				5343BF4FAB6BAB4FD4B514E7 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -240,6 +240,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		11DE2B1A37C063FF2E1AF043 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-KudiLoop/Pods-KudiLoop-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-KudiLoop/Pods-KudiLoop-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
@@ -288,7 +310,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-KudiLoop/Pods-KudiLoop-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		C1556103629B09E01BE36F34 /* [Expo] Configure project */ = {
+		F24A57064A07865141E8B50E /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -312,28 +334,6 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-KudiLoop/expo-configure-project.sh\"\n";
 		};
-		FED7FF9C444C87EB1C2F7A71 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-KudiLoop/Pods-KudiLoop-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-KudiLoop/Pods-KudiLoop-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -342,7 +342,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				AD771282291185D65D051B1C /* ExpoModulesProvider.swift in Sources */,
+				20F34DDAC8D2B513EA5067FC /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -351,7 +351,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 4CD722F2D31B39DB58ECCD4A /* Pods-KudiLoop.debug.xcconfig */;
+			baseConfigurationReference = E1DBE88DD4E72D6C7EF2FCD5 /* Pods-KudiLoop.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -387,7 +387,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 13B1505655415E87265E3DAC /* Pods-KudiLoop.release.xcconfig */;
+			baseConfigurationReference = 8A19FAFCEEC9A4D969E10259 /* Pods-KudiLoop.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;

@@ -8,7 +8,7 @@ export function useInviteInfo(token: string) {
   return useQuery({
     queryKey: queryKeys.invite(token),
     queryFn: async () => {
-      const { data } = await api.get<InviteInfo>(`/invite/${token}`);
+      const { data } = await api.get<InviteInfo>(`/invites/${token}`);
       return data;
     },
     enabled: !!token,

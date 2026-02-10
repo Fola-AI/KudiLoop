@@ -154,9 +154,19 @@ export function useJoinGroup() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (token: string) => {
-      const { data } = await api.post(`/invite/${token}/join`);
-      return data;
+    mutationFn: async ({ token, name, phone }: { token: string; name: string; phone: string }) => {
+      try {
+        const { data } = await api.post(`/invites/${token}/accept`, { name, phone });
+        return data;
+      } catch (error: any) {
+        // Log the full error details
+        console.log('🔴 Join group error:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.groups });

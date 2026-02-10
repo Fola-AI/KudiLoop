@@ -4,20 +4,46 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
-import { Card, Button, Badge, Avatar, AvatarStack } from "@/components/ui";
+import { Card, Button, AvatarStack, Input } from "@/components/ui";
 import { colors } from "@/theme";
 import { formatCurrency } from "@/utils";
-import { useInviteInfo, useJoinGroup } from "@/hooks/api/useInvite";
+import { useInviteInfo } from "@/hooks/api/useInvite";
+import { useJoinGroup } from "@/hooks/api/useGroups";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function JoinGroupScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, user, clerkUser } = useAuth();
   const { data: inviteData, isLoading, error } = useInviteInfo(token || '');
   const joinGroup = useJoinGroup();
   const [isJoining, setIsJoining] = useState(false);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  
+  const userFullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+  const clerkFullName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ').trim();
+  const authName = (user?.preferredName || userFullName || clerkFullName || '').trim();
+  const authPhone = (user?.phone || '').trim();
+  
+  useEffect(() => {
+    if (!name && authName) {
+      setName(authName);
+    }
+  }, [authName, name]);
+  
+  useEffect(() => {
+    if (!phone && authPhone) {
+      setPhone(authPhone);
+    }
+  }, [authPhone, phone]);
+  
+  const needsNameInput = isSignedIn && !authName;
+  const needsPhoneInput = isSignedIn && !authPhone;
+  const nameToSend = (authName || name).trim();
+  const phoneToSend = (authPhone || phone).trim();
+  const isJoinDisabled = isJoining || (isSignedIn && (!nameToSend || !phoneToSend));
   
   // Determine state from API response
   const getInviteState = () => {
@@ -54,11 +80,16 @@ export default function JoinGroupScreen() {
       return;
     }
     
+    if (!nameToSend || !phoneToSend) {
+      safeAlert("Missing Info", "Please enter your name and phone number to join this group.");
+      return;
+    }
+    
     setIsJoining(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     
     try {
-      await joinGroup.mutateAsync(token);
+      await joinGroup.mutateAsync({ token, name: nameToSend, phone: phoneToSend });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
       // Navigate to the group
@@ -285,6 +316,41 @@ export default function JoinGroupScreen() {
               </Card>
             </Animated.View>
             
+            {(needsNameInput || needsPhoneInput) && (
+              <Animated.View entering={FadeInDown.delay(150)}>
+                <Card style={{ padding: 16, marginBottom: 16 }}>
+                  <Text style={{ color: 'white', fontSize: 16, fontWeight: '600', marginBottom: 6 }}>
+                    Your details
+                  </Text>
+                  <Text style={{ color: '#9ca3af', fontSize: 13, marginBottom: 12 }}>
+                    We need this to add you to the group.
+                  </Text>
+                  <View style={{ gap: 12 }}>
+                    {needsNameInput && (
+                      <Input
+                        label="Full name"
+                        placeholder="Enter your full name"
+                        autoCapitalize="words"
+                        value={name}
+                        onChangeText={setName}
+                        textContentType="name"
+                      />
+                    )}
+                    {needsPhoneInput && (
+                      <Input
+                        label="Phone number"
+                        placeholder="Enter your phone number"
+                        keyboardType="phone-pad"
+                        value={phone}
+                        onChangeText={setPhone}
+                        textContentType="telephoneNumber"
+                      />
+                    )}
+                  </View>
+                </Card>
+              </Animated.View>
+            )}
+            
             {/* How it works */}
             <Animated.View entering={FadeInDown.delay(200)}>
               <Card style={{ padding: 16, marginBottom: 16 }}>
@@ -398,7 +464,7 @@ export default function JoinGroupScreen() {
               size="lg"
               onPress={handleJoin}
               loading={isJoining}
-              disabled={isJoining}
+              disabled={isJoinDisabled}
             >
               {isSignedIn ? `Join ${group.name}` : 'Sign In to Join'}
             </Button>
