@@ -38,6 +38,10 @@ export const queryClient = new QueryClient({
       
       // Refetch when network reconnects
       refetchOnReconnect: true,
+
+      // Silent background refresh every 5 seconds for near real-time updates.
+      refetchInterval: 5000,
+      refetchIntervalInBackground: true,
       
       // Use cached data while fetching (optimistic by default)
       placeholderData: (previousData: any) => previousData,

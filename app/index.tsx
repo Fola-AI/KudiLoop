@@ -1,12 +1,18 @@
 import { Redirect } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
+import { View, ActivityIndicator } from "react-native";
+import { colors } from "@/theme";
 
 export default function Index() {
-  // For testing, go directly to main app
-  // Later: check auth state and redirect accordingly
-  return <Redirect href="/(app)/(tabs)" />;
-  
-  // When connecting to real auth:
-  // const { isAuthenticated, isLoading } = useAuthStore();
-  // if (isLoading) return <LoadingScreen />;
-  // return <Redirect href={isAuthenticated ? "/(app)/(tabs)" : "/(auth)/welcome"} />;
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={colors.primary.DEFAULT} />
+      </View>
+    );
+  }
+
+  return <Redirect href={isSignedIn ? "/(app)/(tabs)" : "/(auth)/sign-in"} />;
 }

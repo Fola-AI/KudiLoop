@@ -1,8 +1,8 @@
 # KudiLoop Mobile App Documentation
 
-> **Version:** 1.0.0  
+> **Version:** 1.2.1  
 > **Platform:** React Native / Expo  
-> **Last Updated:** December 2024
+> **Last Updated:** February 10, 2026
 
 ---
 
@@ -51,7 +51,8 @@ app/
 │   ├── verify-email.tsx     # Email verification OTP
 │   ├── pin-setup.tsx        # Set up app PIN
 │   ├── pin-entry.tsx        # PIN re-authentication
-│   └── biometric-setup.tsx  # Face ID / Touch ID setup
+│   ├── biometric-setup.tsx  # Face ID / Touch ID setup
+│   └── biometric-unlock.tsx # Biometric re-authentication
 │
 ├── (app)/                   # Main app (requires authentication)
 │   ├── _layout.tsx          # App layout with auth guard
@@ -61,7 +62,7 @@ app/
 │   │   ├── index.tsx        # Home screen (dashboard)
 │   │   ├── groups.tsx       # Groups list
 │   │   ├── activity.tsx     # Transaction history
-│   │   └── profile.tsx      # User profile & settings
+│   │   └── marketplace.tsx  # Partner marketplace
 │   │
 │   ├── group/
 │   │   ├── _layout.tsx      # Group stack layout
@@ -72,13 +73,13 @@ app/
 │   │       ├── members.tsx  # View all members
 │   │       ├── schedule.tsx # Payout schedule
 │   │       ├── contribute.tsx # Make contribution
-│   │       ├── record-payment.tsx # Record member payment (admin)
 │   │       ├── invite.tsx   # Invite members
 │   │       ├── add-member.tsx # Add member manually
 │   │       └── settings.tsx # Group settings
 │   │
 │   ├── profile/
 │   │   ├── _layout.tsx
+│   │   ├── index.tsx        # Profile overview
 │   │   ├── edit.tsx         # Edit profile
 │   │   ├── banks.tsx        # Bank accounts
 │   │   └── pots.tsx         # Savings pots
@@ -211,7 +212,7 @@ config/
 | Home | `/(app)/(tabs)` | `index.tsx` | Dashboard with balance, groups preview, quick actions |
 | Groups | `/(app)/(tabs)/groups` | `groups.tsx` | All user's groups with filters |
 | Activity | `/(app)/(tabs)/activity` | `activity.tsx` | Transaction history |
-| Profile | `/(app)/(tabs)/profile` | `profile.tsx` | Settings and account management |
+| Marketplace | `/(app)/(tabs)/marketplace` | `marketplace.tsx` | Partner offers and deals |
 
 ### Auth Screens
 
@@ -225,6 +226,7 @@ config/
 | PIN Setup | `/(auth)/pin-setup` | `pin-setup.tsx` | Create 4-digit PIN | Custom PIN pad |
 | PIN Entry | `/(auth)/pin-entry` | `pin-entry.tsx` | Re-auth with PIN | Custom PIN pad |
 | Biometric Setup | `/(auth)/biometric-setup` | `biometric-setup.tsx` | Enable Face ID/Touch ID | Button |
+| Biometric Unlock | `/(auth)/biometric-unlock` | `biometric-unlock.tsx` | Biometric re-authentication | Button |
 
 ### Group Screens
 
@@ -235,7 +237,6 @@ config/
 | Members | `/group/[id]/members` | `members.tsx` | All group members | Avatar, Card |
 | Schedule | `/group/[id]/schedule` | `schedule.tsx` | Payout rotation order | Card, Badge |
 | Contribute | `/group/[id]/contribute` | `contribute.tsx` | Make a contribution | Button, Card |
-| Record Payment | `/group/[id]/record-payment` | `record-payment.tsx` | Admin: mark member as paid | Card, Avatar |
 | Invite | `/group/[id]/invite` | `invite.tsx` | Generate & share invite links | Card, Button |
 | Add Member | `/group/[id]/add-member` | `add-member.tsx` | Manually add member | Input, Button |
 | Settings | `/group/[id]/settings` | `settings.tsx` | Group settings & privacy | Card, Switch |
@@ -244,6 +245,7 @@ config/
 
 | Screen | Route | File | Description | Components Used |
 |--------|-------|------|-------------|-----------------|
+| Profile Home | `/profile` | `index.tsx` | Profile overview | Card, Button |
 | Edit Profile | `/profile/edit` | `edit.tsx` | Update personal info | Input, Button, Avatar |
 | Bank Accounts | `/profile/banks` | `banks.tsx` | Manage bank details | Card, Input |
 | Savings Pots | `/profile/pots` | `pots.tsx` | View/manage savings pots | Card, Button |
@@ -315,8 +317,8 @@ config/
 | `GET` | `/api/groups/:id/invites` | `hooks/api/useGroups.ts` | None | `InviteLink[]` | List group invites |
 | `POST` | `/api/groups/:id/invites` | `hooks/api/useGroups.ts` | `{ expiresInDays?, maxUses? }` | `InviteLink` | Create invite |
 | `DELETE` | `/api/groups/:id/invites/:inviteId` | `hooks/api/useGroups.ts` | None | None | Delete invite |
-| `GET` | `/api/invite/:token` | `hooks/api/useInvite.ts` | None | `InviteInfo` | Validate invite (public) |
-| `POST` | `/api/invite/:token/join` | `hooks/api/useGroups.ts` | None | `{ groupId, memberId }` | Join via invite |
+| `GET` | `/api/invites/:token` | `hooks/api/useInvite.ts` | None | `InviteInfo` | Validate invite (public) |
+| `POST` | `/api/invites/:token/accept` | `hooks/api/useGroups.ts` | `{ name, phone }` | `{ groupId, memberId }` | Join via invite |
 
 ### Savings Pots
 
@@ -342,6 +344,14 @@ config/
 | `GET` | `/api/notifications/unread-count` | `hooks/api/useNotifications.ts` | None | `{ count }` | Get unread count |
 | `PATCH` | `/api/notifications/:id/read` | `hooks/api/useNotifications.ts` | `{}` | None | Mark as read |
 | `POST` | `/api/notifications/mark-all-read` | `hooks/api/useNotifications.ts` | `{}` | None | Mark all as read |
+
+### Marketplace (Partners)
+
+| Method | Endpoint | File | Request Body | Response | Description |
+|--------|----------|------|--------------|----------|-------------|
+| `GET` | `/api/partners` | `hooks/api/usePartners.ts` | None | `Partner[]` | List partner offers |
+| `GET` | `/api/partners/:id` | `hooks/api/usePartners.ts` | None | `Partner` | Get partner details |
+| `POST` | `/api/partners/:id/click` | `hooks/api/usePartners.ts` | None | `{ success: true }` | Track partner click |
 
 ### Device Tokens (Push Notifications)
 
@@ -379,7 +389,7 @@ config/
 | `useGroupInvites(groupId)` | `GET /groups/:id/invites` | `{ data: InviteLink[], ... }` |
 | `useCreateInvite(groupId)` | `POST /groups/:id/invites` | `mutation` |
 | `useDeleteInvite(groupId)` | `DELETE /groups/:id/invites/:id` | `mutation` |
-| `useJoinGroup()` | `POST /invite/:token/join` | `mutation` |
+| `useJoinGroup()` | `POST /invites/:token/accept` | `mutation` |
 | `useUpdateRotationOrder(groupId)` | `PUT /groups/:id/rotation-order` | `mutation` |
 
 #### `useContributions.ts`
@@ -414,7 +424,7 @@ config/
 
 | Hook | API Call | Returns |
 |------|----------|---------|
-| `useInviteInfo(token)` | `GET /invite/:token` | `{ data: InviteInfo, ... }` |
+| `useInviteInfo(token)` | `GET /invites/:token` | `{ data: InviteInfo, ... }` |
 
 #### `useNotifications.ts`
 
@@ -424,6 +434,14 @@ config/
 | `useUnreadNotificationCount()` | `GET /notifications/unread-count` | `{ data: number }` |
 | `useMarkNotificationRead()` | `PATCH /notifications/:id/read` | `mutation` |
 | `useMarkAllNotificationsRead()` | `POST /notifications/mark-all-read` | `mutation` |
+
+#### `usePartners.ts`
+
+| Hook | API Call | Returns |
+|------|----------|---------|
+| `usePartners()` | `GET /partners` | `{ data: Partner[], ... }` |
+| `usePartner(id)` | `GET /partners/:id` | `{ data: Partner, ... }` |
+| `useTrackPartnerClick()` | `POST /partners/:id/click` | `mutation` |
 
 ### Utility Hooks
 
@@ -947,6 +965,7 @@ KudiLoop uses **Clerk** for authentication combined with a custom backend for us
 
 2. **Sign In/Up** (`app/(auth)/sign-in.tsx`, `sign-up.tsx`)
    - Email/password authentication
+   - Magic link via email (sign-in)
    - OAuth (Google, Apple) via Clerk's `useSSO`
    - 2FA support (TOTP, SMS, Email codes)
 
@@ -994,6 +1013,8 @@ api.interceptors.request.use(async (config) => {
 interface AuthContextType {
   isSignedIn: boolean;
   isLoaded: boolean;
+  isAuthenticating: boolean;
+  setIsAuthenticating: (value: boolean) => void;
   clerkUser: { id, email, firstName, lastName, imageUrl } | null;
   user: User | null;           // From KudiLoop database
   isLoadingUser: boolean;

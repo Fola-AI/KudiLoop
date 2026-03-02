@@ -3,6 +3,7 @@ import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import { Card, Button } from "@/components/ui";
@@ -25,7 +26,6 @@ interface GroupFormData {
   contributionAmount: string;
   currency: Currency;
   frequency: Frequency;
-  totalCycles: string; // Number of cycles (minimum 3)
   
   // Step 3: Settings
   visibility: Visibility;
@@ -33,7 +33,8 @@ interface GroupFormData {
   payoutMedium: PayoutMedium;
   
   // Step 4: Schedule
-  goLiveDays: number; // 1-7 days from now
+  goLiveDate: Date;
+  firstCollectionDate: Date;
 }
 
 const TOTAL_STEPS = 5;
@@ -235,50 +236,32 @@ function FormInput({
   );
 }
 
-// Day Selector for Go-Live
-function DaySelector({ 
-  selectedDays, 
-  onSelect 
-}: { 
-  selectedDays: number;
-  onSelect: (days: number) => void;
-}) {
-  const options = [1, 2, 3, 5, 7];
-  
-  return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-      {options.map((days) => (
-        <Pressable
-          key={days}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onSelect(days);
-          }}
-          style={{
-            paddingHorizontal: 20,
-            paddingVertical: 12,
-            borderRadius: 12,
-            borderWidth: 2,
-            borderColor: selectedDays === days ? colors.primary.DEFAULT : "#374151",
-            backgroundColor: selectedDays === days ? "rgba(255,107,53,0.1)" : "#1f2937",
-          }}
-        >
-          <Text style={{ 
-            color: selectedDays === days ? colors.primary.DEFAULT : "white",
-            fontWeight: "600",
-          }}>
-            {days} {days === 1 ? "Day" : "Days"}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
+const toDateOnly = (date: Date) => {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+};
+
+const formatLongDate = (date: Date) =>
+  date.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
 export default function CreateGroupScreen() {
+  const today = toDateOnly(new Date());
+  const defaultGoLiveDate = new Date(today);
+  defaultGoLiveDate.setDate(defaultGoLiveDate.getDate() + 1);
+  const defaultFirstCollectionDate = new Date(defaultGoLiveDate);
+  defaultFirstCollectionDate.setDate(defaultFirstCollectionDate.getDate() + 7);
+
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showGoLivePicker, setShowGoLivePicker] = useState(false);
+  const [showFirstCollectionPicker, setShowFirstCollectionPicker] = useState(false);
   
   const [formData, setFormData] = useState<GroupFormData>({
     name: "",
@@ -286,11 +269,11 @@ export default function CreateGroupScreen() {
     contributionAmount: "",
     currency: "NGN",
     frequency: "monthly",
-    totalCycles: "",
     visibility: "closed",
     maxMembers: "",
     payoutMedium: "admin",
-    goLiveDays: 3,
+    goLiveDate: defaultGoLiveDate,
+    firstCollectionDate: defaultFirstCollectionDate,
   });
   
   const createGroup = useCreateGroup();
@@ -321,9 +304,6 @@ export default function CreateGroupScreen() {
         } else if (parseInt(formData.contributionAmount) < 100) {
           newErrors.contributionAmount = "Minimum amount is 100";
         }
-        if (formData.totalCycles && parseInt(formData.totalCycles) < 3) {
-          newErrors.totalCycles = "Minimum 3 cycles required";
-        }
         break;
         
       case 3:
@@ -331,7 +311,12 @@ export default function CreateGroupScreen() {
         break;
         
       case 4:
-        // Go-live days already has a default
+        if (toDateOnly(formData.goLiveDate) <= today) {
+          newErrors.goLiveDate = "Go-live date must be in the future";
+        }
+        if (toDateOnly(formData.firstCollectionDate) < toDateOnly(formData.goLiveDate)) {
+          newErrors.firstCollectionDate = "First collection date must be on or after go-live date";
+        }
         break;
     }
     
@@ -358,24 +343,12 @@ export default function CreateGroupScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     
     try {
-      // Calculate dates
-      const goLiveDate = new Date();
-      goLiveDate.setDate(goLiveDate.getDate() + formData.goLiveDays);
-      
-      const startDate = new Date().toISOString().split('T')[0];
-      
-      // Calculate next collection date (first collection after go-live)
-      const nextCollectionDate = new Date(goLiveDate);
-      if (formData.frequency === 'weekly') {
-        nextCollectionDate.setDate(nextCollectionDate.getDate() + 7);
-      } else {
-        nextCollectionDate.setMonth(nextCollectionDate.getMonth() + 1);
-      }
-      
-      // Determine total cycles - if not specified, default to maxMembers or 3
-      const totalCycles = formData.totalCycles 
-        ? parseInt(formData.totalCycles) 
-        : (formData.maxMembers ? parseInt(formData.maxMembers) : 3);
+      const goLiveDate = new Date(formData.goLiveDate);
+      goLiveDate.setHours(12, 0, 0, 0);
+      const firstCollectionDate = toDateOnly(formData.firstCollectionDate);
+      const startDate = firstCollectionDate.toISOString().split("T")[0];
+      const nextCollectionDate = startDate;
+      const totalCycles = formData.maxMembers ? parseInt(formData.maxMembers) : 3;
       
       const newGroup = await createGroup.mutateAsync({
         name: formData.name,
@@ -388,7 +361,7 @@ export default function CreateGroupScreen() {
         payoutMedium: formData.payoutMedium,
         totalCycles: Math.max(3, totalCycles), // Minimum 3 cycles
         goLiveDate: goLiveDate.toISOString(),
-        nextCollectionDate: nextCollectionDate.toISOString().split('T')[0],
+        nextCollectionDate,
         startDate: startDate,
       });
       
@@ -424,16 +397,29 @@ export default function CreateGroupScreen() {
   };
   
   const selectedCurrency = CURRENCIES.find(c => c.value === formData.currency);
-  
-  // Calculate go-live date
-  const goLiveDate = new Date();
-  goLiveDate.setDate(goLiveDate.getDate() + formData.goLiveDays);
+
+  const handleGoLiveDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === "android") setShowGoLivePicker(false);
+    if (event.type !== "set" || !date) return;
+
+    const selectedDate = toDateOnly(date);
+    updateForm("goLiveDate", selectedDate);
+    if (toDateOnly(formData.firstCollectionDate) < selectedDate) {
+      updateForm("firstCollectionDate", selectedDate);
+    }
+  };
+
+  const handleFirstCollectionDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === "android") setShowFirstCollectionPicker(false);
+    if (event.type !== "set" || !date) return;
+    updateForm("firstCollectionDate", toDateOnly(date));
+  };
   
   const renderStep = () => {
     switch (currentStep) {
       case 1:
         return (
-          <View key="step1" style={{ flex: 1 }}>
+          <View key="step1">
             <Text style={{ color: "white", fontSize: 24, fontWeight: "bold", marginBottom: 8 }}>
               Name your savings circle
             </Text>
@@ -461,7 +447,7 @@ export default function CreateGroupScreen() {
         
       case 2:
         return (
-          <View key="step2" style={{ flex: 1 }}>
+          <View key="step2">
             <Text style={{ color: "white", fontSize: 24, fontWeight: "bold", marginBottom: 8 }}>
               Set contribution details
             </Text>
@@ -511,35 +497,12 @@ export default function CreateGroupScreen() {
               />
             ))}
             
-            {/* Total Cycles */}
-            <FormInput
-              label="Number of Cycles (Min 3)"
-              value={formData.totalCycles}
-              onChangeText={(text) => updateForm("totalCycles", text.replace(/[^0-9]/g, ""))}
-              placeholder="e.g., 6 (equals to 6 members)"
-              keyboardType="numeric"
-              error={errors.totalCycles}
-            />
-            <View style={{ 
-              marginTop: -12,
-              marginBottom: 8,
-              padding: 12, 
-              backgroundColor: "rgba(59,130,246,0.1)", 
-              borderRadius: 8,
-              flexDirection: "row",
-              alignItems: "flex-start",
-            }}>
-              <Ionicons name="information-circle" size={16} color="#3b82f6" style={{ marginRight: 6, marginTop: 1 }} />
-              <Text style={{ color: "#93c5fd", fontSize: 12, flex: 1 }}>
-                Each cycle, one member receives the pot. Number of cycles = number of members.
-              </Text>
-            </View>
           </View>
         );
         
       case 3:
         return (
-          <View key="step3" style={{ flex: 1 }}>
+          <View key="step3">
             <Text style={{ color: "white", fontSize: 24, fontWeight: "bold", marginBottom: 8 }}>
               Group settings
             </Text>
@@ -564,7 +527,7 @@ export default function CreateGroupScreen() {
               onPress={() => updateForm("visibility", "open")}
               icon="globe-outline"
               title="Open Group"
-              description="Anyone with link can request to join"
+              description="Group is visible on KudiLoop and open to any user"
             />
             
             {/* Payout Method */}
@@ -600,7 +563,7 @@ export default function CreateGroupScreen() {
         
       case 4:
         return (
-          <View key="step4" style={{ flex: 1 }}>
+          <View key="step4">
             <Text style={{ color: "white", fontSize: 24, fontWeight: "bold", marginBottom: 8 }}>
               When should we start?
             </Text>
@@ -609,12 +572,79 @@ export default function CreateGroupScreen() {
             </Text>
             
             <Text style={{ color: "#9ca3af", fontSize: 14, marginBottom: 12, fontWeight: "500" }}>
-              Go Live In
+              Group goes live on
             </Text>
-            <DaySelector
-              selectedDays={formData.goLiveDays}
-              onSelect={(days) => updateForm("goLiveDays", days)}
-            />
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowGoLivePicker((prev) => !prev);
+                setShowFirstCollectionPicker(false);
+              }}
+              style={{
+                borderWidth: 2,
+                borderColor: errors.goLiveDate ? colors.error.DEFAULT : "#374151",
+                borderRadius: 12,
+                backgroundColor: "#1f2937",
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                marginBottom: 8,
+              }}
+            >
+              <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+                {formatLongDate(formData.goLiveDate)}
+              </Text>
+              <Text style={{ color: "#9ca3af", fontSize: 12, marginTop: 4 }}>Tap to choose date</Text>
+            </Pressable>
+            {errors.goLiveDate ? (
+              <Text style={{ color: colors.error.DEFAULT, fontSize: 12, marginBottom: 12 }}>{errors.goLiveDate}</Text>
+            ) : null}
+
+            {showGoLivePicker && (
+              <DateTimePicker
+                value={formData.goLiveDate}
+                mode="date"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                minimumDate={defaultGoLiveDate}
+                onChange={handleGoLiveDateChange}
+              />
+            )}
+
+            <Text style={{ color: "#9ca3af", fontSize: 14, marginBottom: 12, marginTop: 16, fontWeight: "500" }}>
+              First Collection Date
+            </Text>
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowFirstCollectionPicker((prev) => !prev);
+                setShowGoLivePicker(false);
+              }}
+              style={{
+                borderWidth: 2,
+                borderColor: errors.firstCollectionDate ? colors.error.DEFAULT : "#374151",
+                borderRadius: 12,
+                backgroundColor: "#1f2937",
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+              }}
+            >
+              <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+                {formatLongDate(formData.firstCollectionDate)}
+              </Text>
+              <Text style={{ color: "#9ca3af", fontSize: 12, marginTop: 4 }}>Tap to choose date</Text>
+            </Pressable>
+            {errors.firstCollectionDate ? (
+              <Text style={{ color: colors.error.DEFAULT, fontSize: 12, marginTop: 8 }}>{errors.firstCollectionDate}</Text>
+            ) : null}
+
+            {showFirstCollectionPicker && (
+              <DateTimePicker
+                value={formData.firstCollectionDate}
+                mode="date"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                minimumDate={formData.goLiveDate}
+                onChange={handleFirstCollectionDateChange}
+              />
+            )}
             
             {/* Preview */}
             <Card style={{ marginTop: 24, padding: 16 }}>
@@ -632,12 +662,7 @@ export default function CreateGroupScreen() {
                 <View style={{ marginLeft: 12 }}>
                   <Text style={{ color: "#9ca3af", fontSize: 13 }}>Group goes live on</Text>
                   <Text style={{ color: "white", fontSize: 18, fontWeight: "600" }}>
-                    {goLiveDate.toLocaleDateString("en-GB", { 
-                      weekday: "long",
-                      day: "numeric", 
-                      month: "long",
-                      year: "numeric"
-                    })}
+                    {formatLongDate(formData.goLiveDate)}
                   </Text>
                 </View>
               </View>
@@ -661,11 +686,11 @@ export default function CreateGroupScreen() {
         
       case 5:
         // Review Step
-        const cycleCount = formData.totalCycles ? parseInt(formData.totalCycles) : (formData.maxMembers ? parseInt(formData.maxMembers) : 6);
+        const cycleCount = formData.maxMembers ? parseInt(formData.maxMembers) : 3;
         const totalPotExample = parseInt(formData.contributionAmount || "0") * cycleCount;
         
         return (
-          <View key="step5" style={{ flex: 1 }}>
+          <View key="step5">
             <Text style={{ color: "white", fontSize: 24, fontWeight: "bold", marginBottom: 8 }}>
               Review your group
             </Text>
@@ -718,16 +743,16 @@ export default function CreateGroupScreen() {
                 </View>
                 
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ color: "#9ca3af" }}>Total Cycles</Text>
-                  <Text style={{ color: "white", fontWeight: "600" }}>
-                    {cycleCount} cycles
-                  </Text>
-                </View>
-                
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ color: "#9ca3af" }}>Go Live Date</Text>
                   <Text style={{ color: colors.primary.DEFAULT, fontWeight: "600" }}>
-                    {goLiveDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    {formData.goLiveDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ color: "#9ca3af" }}>First Collection</Text>
+                  <Text style={{ color: colors.primary.DEFAULT, fontWeight: "600" }}>
+                    {formData.firstCollectionDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                   </Text>
                 </View>
                 
@@ -793,7 +818,7 @@ export default function CreateGroupScreen() {
         {/* Content */}
         <ScrollView 
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 24, paddingBottom: 120 }}
+          contentContainerStyle={{ padding: 24, paddingBottom: 180 }}
           keyboardShouldPersistTaps="handled"
         >
           {renderStep()}

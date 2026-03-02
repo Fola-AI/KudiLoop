@@ -145,10 +145,10 @@ export default function BiometricUnlockScreen() {
           text: "OK",
           onPress: async () => {
             // Clear all auth state
-            await secureStorage.clearAll();
+            await secureStorage.clearSessionState();
             await secureStorage.setAppLocked(false);
             await signOut();
-            router.replace("/(auth)/welcome");
+            router.replace("/(auth)/sign-in");
           },
         },
       ]

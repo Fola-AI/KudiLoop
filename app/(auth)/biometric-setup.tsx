@@ -353,7 +353,7 @@ export default function BiometricSetupScreen() {
             <FeatureItem 
               icon="time" 
               title="Auto-Lock Protection" 
-              description="App locks after 2 minutes of inactivity"
+              description="App locks after 3 minutes of inactivity"
             />
           </View>
         </View>

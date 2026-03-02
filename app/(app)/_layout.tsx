@@ -79,7 +79,7 @@ export default function AppLayout() {
   
   // Not signed in? Go to auth
   if (!isSignedIn) {
-    return <Redirect href="/(auth)/welcome" />;
+    return <Redirect href="/(auth)/sign-in" />;
   }
 
   // Loading user from backend

@@ -774,6 +774,7 @@ export default function GroupDetailScreen() {
   const daysUntil = nextDate 
     ? Math.ceil((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     : null;
+  const collectionLabel = group.currentCycle <= 1 ? "First Collection Date" : "Next Collection Date";
   
   return (
     <>
@@ -980,7 +981,7 @@ export default function GroupDetailScreen() {
                       <Ionicons name="calendar-outline" size={24} color={colors.primary.DEFAULT} />
                     </View>
                     <View style={{ marginLeft: 12 }}>
-                      <Text style={{ color: colors.textMuted, fontSize: 13 }}>Next Collection</Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 13 }}>{collectionLabel}</Text>
                       <Text style={{ color: colors.text, fontWeight: "500" }}>
                         {nextDate.toLocaleDateString()}
                       </Text>
@@ -1244,12 +1245,12 @@ export default function GroupDetailScreen() {
                 <Text style={{ color: colors.text, textTransform: "capitalize" }}>{group.frequency}</Text>
               </View>
               
-              {group.payoutMethod && (
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-                  <Text style={{ color: colors.textSubtle }}>Payout Method</Text>
-                  <Text style={{ color: colors.text }}>{group.payoutMethod === "admin" ? "Via Admin" : "Direct"}</Text>
-                </View>
-              )}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                <Text style={{ color: colors.textSubtle }}>Payout Method</Text>
+                <Text style={{ color: colors.text }}>
+                  {(group.payoutMedium || (group as any).payoutMethod) === "cycle_receiver" ? "Direct to Recipient" : "Via Admin"}
+                </Text>
+              </View>
               
               {group.yourPosition && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>

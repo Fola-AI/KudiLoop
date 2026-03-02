@@ -1,6 +1,6 @@
 # 📊 KudiLoop Project Status Report
 
-> Generated: January 19, 2026
+> Generated: February 10, 2026
 
 ## 1. Current State Summary
 
@@ -10,12 +10,14 @@
 |--------|--------|
 | **Framework** | Expo Router v6 (file-based routing) |
 | **React Native** | 0.81.5 with New Architecture enabled |
+| **App Version** | 1.2.1 (iOS build 15, Android versionCode 15) |
 | **Authentication** | Clerk (`@clerk/clerk-expo`) |
 | **Database** | Neon PostgreSQL with Drizzle ORM |
 | **State Management** | Zustand + React Query v5 |
 | **Styling** | NativeWind (Tailwind CSS) |
 | **Image Storage** | Cloudinary |
-| **Build System** | EAS Build (development, preview, production channels) |
+| **Build System** | EAS Build (dev-client, preview, production) + remote appVersionSource |
+| **Deep Links** | `kudiloop://` and universal links (`https://kudiloop.com/join/...`) |
 
 ---
 
@@ -45,7 +47,7 @@ app/
 │   │   ├── index.tsx        # Home (Dashboard)
 │   │   ├── groups.tsx       # Groups list
 │   │   ├── activity.tsx     # Activity feed
-│   │   └── profile.tsx      # User profile
+│   │   └── marketplace.tsx  # Partner marketplace
 │   ├── group/
 │   │   ├── create.tsx       # Create new group
 │   │   └── [id]/            # Dynamic group screens
@@ -57,12 +59,18 @@ app/
 │   │       ├── add-member.tsx
 │   │       └── settings.tsx
 │   ├── profile/
+│   │   ├── index.tsx        # Profile home
 │   │   ├── edit.tsx         # Edit profile
 │   │   ├── banks.tsx        # Bank accounts
 │   │   └── pots.tsx         # Savings pots
 │   ├── notifications.tsx
 │   ├── privacy.tsx
-│   └── terms.tsx
+│   ├── terms.tsx
+│   └── admin/
+│       ├── index.tsx        # Admin dashboard
+│       └── partner/
+│           ├── new.tsx      # Create partner
+│           └── [id].tsx     # Edit partner
 └── join/                    # Invite link handler
     └── [token].tsx
 ```
@@ -122,7 +130,7 @@ app/
 | `routes.ts` | **93 API endpoints** (4,147 lines) |
 | `storage.ts` | Database operations (Drizzle) |
 | `clerkAuth.ts` | Clerk JWT verification middleware |
-| `customAuth.ts` | Custom auth helpers |
+| `customAuth.ts` | Legacy auth helpers (not used by mobile app) |
 | `dateUtils.ts` | Date formatting utilities |
 
 ---
@@ -134,18 +142,27 @@ app/
 ```json
 {
   "name": "KudiLoop",
-  "bundleIdentifier": "com.kudiloop.app",
-  "version": "1.0.0",
-  "iOS buildNumber": "8",
-  "Android versionCode": "1",
-  "newArchEnabled": true,
-  "scheme": "kudiloop://",
+  "scheme": "kudiloop",
+  "version": "1.2.1",
+  "ios": {
+    "bundleIdentifier": "com.kudiloop.app",
+    "buildNumber": "15",
+    "newArchEnabled": true
+  },
+  "android": {
+    "package": "com.kudiloop.app",
+    "versionCode": 15,
+    "newArchEnabled": true
+  },
   "plugins": [
     "expo-router",
     "expo-secure-store",
+    "expo-dev-client",
+    "expo-web-browser",
     "expo-notifications",
     "expo-image-picker",
-    "expo-local-authentication"
+    "expo-local-authentication",
+    "expo-font"
   ]
 }
 ```
@@ -154,9 +171,11 @@ app/
 
 | Profile | Distribution | Android | iOS |
 |---------|-------------|---------|-----|
-| `development` | Internal | APK (debug) | Device |
+| `development` | Internal + dev-client | APK (assembleDebug) | Device |
 | `preview` | Internal | APK | Device |
 | `production` | Store | AAB (auto-increment) | App Store |
+
+**App Version Source:** `remote` (managed by EAS)
 
 **Production Submit:**
 - iOS: Apple ID configured, ASC App ID: `6756009015`
@@ -209,10 +228,10 @@ EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 ### Tab Navigation (`(app)/(tabs)/`)
 
 ```
-┌─────────┬─────────┬──────────┬─────────┐
-│  Home   │ Groups  │ Activity │ Profile │
-│ (index) │         │   🔴     │         │
-└─────────┴─────────┴──────────┴─────────┘
+┌─────────┬─────────┬──────────┬─────────────┐
+│  Home   │ Groups  │ Activity │ Marketplace │
+│ (index) │         │   🔴     │             │
+└─────────┴─────────┴──────────┴─────────────┘
          (unread badge on Activity)
 ```
 
@@ -231,16 +250,20 @@ EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 | `/(app)/(tabs)/` | Home dashboard |
 | `/(app)/(tabs)/groups` | Group list |
 | `/(app)/(tabs)/activity` | Recent activity |
-| `/(app)/(tabs)/profile` | User profile |
+| `/(app)/(tabs)/marketplace` | Partner marketplace |
 | `/(app)/group/create` | New group wizard |
 | `/(app)/group/[id]` | Group details (dynamic) |
 | `/(app)/group/[id]/members` | Member management |
 | `/(app)/group/[id]/schedule` | Payout schedule |
 | `/(app)/group/[id]/contribute` | Make contribution |
 | `/(app)/group/[id]/settings` | Group settings |
+| `/(app)/profile` | Profile home |
 | `/(app)/profile/edit` | Edit profile |
 | `/(app)/profile/banks` | Bank accounts |
 | `/(app)/profile/pots` | Savings pots |
+| `/(app)/admin` | Admin dashboard |
+| `/(app)/admin/partner/new` | Create partner |
+| `/(app)/admin/partner/[id]` | Edit partner |
 | `/join/[token]` | Accept invite |
 
 ---
@@ -250,8 +273,11 @@ EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 ### Backend Endpoints (93 total)
 
 #### Auth & Users
+- `GET /api/auth/clerk-config` - Get Clerk publishable key
 - `GET /api/auth/user` - Get/create current user
 - `PATCH /api/profile` - Update profile
+- `GET /api/settings` - Get user settings
+- `PATCH /api/settings` - Update settings
 - `POST /api/users/profile-photo` - Upload avatar
 - `DELETE /api/account` - Delete account
 
@@ -259,14 +285,21 @@ EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 - `GET/POST /api/groups` - List/create groups
 - `GET/PATCH/DELETE /api/groups/:id` - Group CRUD
 - `GET/PATCH /api/groups/:groupId/members` - Members
-- `POST /api/groups/:groupId/invites` - Create invite
+- `GET/POST /api/groups/:groupId/invites` - List/create invites
+- `DELETE /api/groups/:groupId/invites/:inviteId` - Delete invite
+- `PUT /api/groups/:groupId/rotation-order` - Bulk rotation
 - `POST /api/groups/:groupId/advance-cycle` - Advance cycle
 
 #### Contributions
 - `GET /api/groups/:groupId/contributions`
+- `GET /api/groups/:groupId/contributions?cycle=N`
 - `PATCH /api/contributions/:id`
 - `POST /api/contributions/:id/receipt` - Upload receipt
 - `PATCH /api/contributions/:id/approve|decline`
+
+#### Invites
+- `GET /api/invites/:token` - Public invite preview
+- `POST /api/invites/:token/accept` - Join via invite
 
 #### Savings Pots
 - `GET/POST /api/pots`
@@ -277,6 +310,15 @@ EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 - `GET /api/notifications`
 - `GET /api/notifications/unread-count`
 - `PATCH /api/notifications/:id/read`
+- `POST /api/notifications/mark-all-read`
+
+#### Marketplace (Partners)
+- `GET /api/partners` - List partners
+- `GET /api/partners/:id` - Partner detail
+- `POST /api/partners/:id/click` - Track click
+
+#### Device Tokens
+- `POST /api/device-tokens` - Register push token
 
 #### Admin
 - Full user management, group management, audit logs, SQL query execution
@@ -296,7 +338,7 @@ EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 
 ## 7. Database Schema
 
-**13 Main Tables:**
+**15 Main Tables:**
 
 | Table | Purpose |
 |-------|---------|
@@ -318,43 +360,13 @@ EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 
 ---
 
-## 8. ⚠️ Outstanding Issues
+## 8. ⚠️ Outstanding Issues (Project Check)
 
-### TODOs Found (4)
-
-All in `server/routes.ts`:
-
-```typescript
-// Line ~1554
-// TODO: Add auth back after debugging (was: authMiddleware)
-app.get("/api/groups/:groupId/cycle-status", async (req: any, res) => {
-    // TODO: Add auth back after debugging - member verification disabled
-
-// Line ~1677
-// TODO: Add auth back after debugging (was: authMiddleware)
-app.post("/api/groups/:groupId/advance-cycle", async (req: any, res) => {
-    // TODO: Add auth back after debugging - admin verification disabled
-```
-
-> 🚨 **CRITICAL:** Two endpoints are missing authentication middleware:
-> - `GET /api/groups/:groupId/cycle-status`
-> - `POST /api/groups/:groupId/advance-cycle`
-
-### Console.log Statements
-
-Found **262 console.log statements** across 35 files. Most are wrapped in `if (__DEV__)` checks, which is appropriate. Key files:
-
-| File | Count | Notes |
-|------|-------|-------|
-| `server/routes.ts` | 39 | Server-side logging (acceptable) |
-| `server/storage.ts` | 27 | Database operations |
-| `hooks/usePushNotifications.ts` | 13 | Notification debugging |
-| `app/(app)/profile/edit.tsx` | 12 | Profile editing |
-| `services/api.ts` | 10 | API client logging |
-
-Most are dev-only, but consider a proper logging library for production.
-
-### No FIXMEs Found ✅
+### Findings
+- **No TODO/FIXME markers in source** (only in old documentation).
+- **EAS env mismatch:** `eas.json` uses `EXPO_PUBLIC_ENV=preview`, but `config/env.ts` expects `staging`. Preview builds will fall back to production config.
+- **Platform admin is hardcoded:** server admin access requires `isAdmin === 1` *and* a specific email in `server/routes.ts`.
+- **Legacy auth module:** `server/customAuth.ts` remains but the mobile app uses Clerk; keep or remove to avoid confusion.
 
 ---
 
@@ -362,20 +374,16 @@ Most are dev-only, but consider a proper logging library for production.
 
 ### 🔴 Critical (Security)
 
-1. **Re-enable authentication on unprotected routes:**
-   ```typescript
-   // server/routes.ts line ~1554 and ~1677
-   app.get("/api/groups/:groupId/cycle-status", authMiddleware, ...)
-   app.post("/api/groups/:groupId/advance-cycle", authMiddleware, ...)
-   ```
-
-2. **Create `.env` file** from `env.example` for local development
+1. **Align EAS env values with `config/env.ts`:**
+   - Use `staging` instead of `preview`, or update `config/env.ts` to accept `preview`.
+2. **Move hardcoded platform admin to config/DB:**
+   - Avoid a single email gate for admin access.
 
 ### 🟡 Important
 
 3. **Production logging:** Replace `console.log` with a structured logger (e.g., `pino`) that respects `NODE_ENV`
 
-4. **Server routes file is 4,147 lines** - consider splitting into:
+4. **Server routes file is large** - consider splitting into:
    - `routes/auth.ts`
    - `routes/groups.ts`
    - `routes/contributions.ts`
@@ -414,8 +422,9 @@ Most are dev-only, but consider a proper logging library for production.
 
 | Priority | Task | Status |
 |----------|------|--------|
-| 🔴 Critical | Fix 2 unprotected API routes | ⬜ Pending |
-| 🔴 Critical | Create `.env` file for local development | ⬜ Pending |
+| 🔴 Critical | Align `EXPO_PUBLIC_ENV` values (preview vs staging) | ⬜ Pending |
+| 🔴 Critical | Remove hardcoded platform admin email | ⬜ Pending |
+| 🟡 Important | Create `.env` file for local development | ⬜ Pending |
 | 🟡 Important | Consider refactoring the large routes file | ⬜ Pending |
 | 🟢 Optional | Add structured logging | ⬜ Pending |
 | 🟢 Optional | Add API documentation | ⬜ Pending |

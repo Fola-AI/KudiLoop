@@ -1,15 +1,16 @@
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator, Pressable, Platform } from "react-native";
 import { safeAlert } from "@/utils/alertGate";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, Stack, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import { useState, useCallback, useMemo } from "react";
 import { Card, Avatar, Badge, Button } from "@/components/ui";
 import { colors } from "@/theme";
 import { formatCurrency } from "@/utils";
 import { useGroup, useGroupMembers, useUpdateRotationOrder } from "@/hooks/api";
-import { getErrorMessage } from "@/services/api";
+import api, { getErrorMessage } from "@/services/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from "react-native-draggable-flatlist";
@@ -339,6 +340,8 @@ export default function ScheduleScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [localUpcomingCycles, setLocalUpcomingCycles] = useState<ScheduleCycle[] | null>(null);
+  const [showCollectionDatePicker, setShowCollectionDatePicker] = useState(false);
+  const [isUpdatingCollectionDate, setIsUpdatingCollectionDate] = useState(false);
   
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
@@ -593,6 +596,29 @@ export default function ScheduleScreen() {
     schedule?.groupStatus === 'pending' || 
     (schedule?.groupStatus === 'active' && upcomingCycles.length > 1)
   );
+
+  const nextCollectionDate = group?.nextCollectionDate ? new Date(group.nextCollectionDate) : null;
+  const handleCollectionDateChange = useCallback(async (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === "android") setShowCollectionDatePicker(false);
+    if (event.type !== "set" || !date || !id || !hasAdminPrivileges) return;
+
+    const selectedDate = new Date(date);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    try {
+      setIsUpdatingCollectionDate(true);
+      await api.patch(`/groups/${id}/collection-date`, {
+        collectionDate: selectedDate.toISOString().split("T")[0],
+      });
+      await Promise.all([refetchGroup(), refetchMembers()]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      safeAlert("Unable to Update Date", getErrorMessage(error));
+    } finally {
+      setIsUpdatingCollectionDate(false);
+    }
+  }, [id, hasAdminPrivileges, refetchGroup, refetchMembers]);
   
   // Render item for draggable list
   const renderDraggableItem = useCallback(({ item, drag, isActive, getIndex }: RenderItemParams<ScheduleCycle>) => {
@@ -786,10 +812,46 @@ export default function ScheduleScreen() {
                     </Text>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ color: colors.textMuted, fontSize: 11 }}>Expected Date</Text>
-                    <Text style={{ color: colors.primary.DEFAULT, fontWeight: "500" }}>{yourCycle.date}</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 11 }}>Next Collection Date</Text>
+                    <Pressable
+                      onPress={() => {
+                        if (!hasAdminPrivileges || isUpdatingCollectionDate) return;
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setShowCollectionDatePicker((prev) => !prev);
+                      }}
+                      disabled={!hasAdminPrivileges || isUpdatingCollectionDate}
+                      style={{ flexDirection: "row", alignItems: "center", marginTop: 2, opacity: hasAdminPrivileges ? 1 : 0.7 }}
+                    >
+                      <Text style={{ color: colors.primary.DEFAULT, fontWeight: "600" }}>
+                        {nextCollectionDate ? nextCollectionDate.toLocaleDateString() : "--"}
+                      </Text>
+                      {hasAdminPrivileges && (
+                        <Ionicons
+                          name={isUpdatingCollectionDate ? "hourglass-outline" : "calendar-outline"}
+                          size={14}
+                          color={colors.primary.DEFAULT}
+                          style={{ marginLeft: 6 }}
+                        />
+                      )}
+                    </Pressable>
                   </View>
                 </View>
+                {hasAdminPrivileges && (
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 12 }}>
+                    Tap date to update collection date.
+                  </Text>
+                )}
+                {showCollectionDatePicker && hasAdminPrivileges && nextCollectionDate && (
+                  <View style={{ marginTop: 12 }}>
+                    <DateTimePicker
+                      value={nextCollectionDate}
+                      mode="date"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      minimumDate={new Date()}
+                      onChange={handleCollectionDateChange}
+                    />
+                  </View>
+                )}
               </Card>
             </View>
           )}

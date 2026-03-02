@@ -337,6 +337,24 @@ export const secureStorage = {
   },
 
   /**
+   * Clear only session/runtime state while preserving local security setup.
+   * Use this for timeout/lock sign-outs so users don't need to re-enroll biometrics/PIN.
+   */
+  async clearSessionState(): Promise<void> {
+    await Promise.all([
+      this.delete(KEYS.LAST_AUTH_TIME),
+      this.delete(KEYS.APP_BACKGROUND_TIME),
+      this.delete(KEYS.APP_LOCKED),
+      this.delete(KEYS.PIN_ATTEMPTS),
+      this.delete(KEYS.PIN_LOCKOUT_UNTIL),
+      this.delete(KEYS.BIOMETRIC_FAILED_ATTEMPTS),
+    ]);
+    if (__DEV__) {
+      console.log('🔐 Session state cleared (security setup preserved)');
+    }
+  },
+
+  /**
    * Clear everything including device ID (full reset)
    */
   async clearAllIncludingDevice(): Promise<void> {
@@ -502,7 +520,7 @@ export const secureStorage = {
    */
   async getInactivityTimeout(): Promise<number> {
     const value = await this.get(KEYS.INACTIVITY_TIMEOUT_MINUTES);
-    return value ? parseInt(value, 10) : 2; // Default to 2 minutes
+    return value ? parseInt(value, 10) : 3; // Default to 3 minutes
   },
 
   /**

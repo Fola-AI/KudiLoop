@@ -4,9 +4,9 @@ import { useRouter, usePathname } from 'expo-router';
 import { secureStorage } from '@/services/secureStorage';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Default timeout is 2 minutes (fintech security requirement)
-const DEFAULT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
-const TIMEOUT_OPTIONS = [1, 2, 5, 10, 15] as const;
+// Default timeout is 3 minutes (fintech security baseline)
+const DEFAULT_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+const TIMEOUT_OPTIONS = [1, 2, 3, 5, 10, 15] as const;
 
 export type TimeoutOption = typeof TIMEOUT_OPTIONS[number];
 
@@ -21,8 +21,8 @@ function minutesToMs(minutes: number): number {
  * Hook to handle session timeout based on user inactivity
  * 
  * Security Features:
- * - 2-minute default timeout (configurable: 1, 2, 5, 10, 15 minutes)
- * - Tracks app background time - if returns within timeout, show biometric unlock
+ * - 3-minute default timeout (configurable: 1, 2, 3, 5, 10, 15 minutes)
+ * - Locks immediately when app is backgrounded/minimized
  * - Tracks foreground inactivity - after timeout, show biometric unlock
  * - Full sign out after extended timeout (2x the normal timeout)
  * 
@@ -104,12 +104,12 @@ export function useSessionTimeout(options?: {
       console.log('🔐 Force sign out due to extended timeout');
     }
     
-    await secureStorage.clearAll();
+    await secureStorage.clearSessionState();
     await secureStorage.setAppLocked(false);
     onTimeout?.();
     await signOut();
     
-    router.replace('/(auth)/welcome');
+    router.replace('/(auth)/sign-in');
   }, [router, signOut, onTimeout]);
 
   /**
@@ -168,6 +168,14 @@ export function useSessionTimeout(options?: {
       }
       
       await secureStorage.updateLastAuthTime();
+
+      // Fintech behavior: lock immediately when app is minimized/backgrounded.
+      const hasPin = await secureStorage.hasPinSet();
+      const hasBiometric = await secureStorage.isBiometricEnabled();
+      if (hasPin || hasBiometric) {
+        setIsLocked(true);
+        await secureStorage.setAppLocked(true);
+      }
       
       if (__DEV__) {
         console.log('🔐 App backgrounded, timers paused');
@@ -191,14 +199,11 @@ export function useSessionTimeout(options?: {
         if (elapsed > extendedTimeout) {
           // Extended timeout - force sign out
           await forceSignOut();
-        } else if (elapsed > timeoutMs) {
-          // Normal timeout - show biometric unlock
+        } else {
+          // Always require re-auth after backgrounding, regardless of elapsed time.
           if (!pathname?.startsWith('/(auth)')) {
             await lockApp('background_timeout');
           }
-        } else {
-          // Within timeout - just restart activity timer
-          registerActivity();
         }
         
         // Clear background time

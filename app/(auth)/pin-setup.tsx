@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -102,7 +102,6 @@ export default function PinSetupScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 16 }}>
         
-        {/* Back Button */}
         <Pressable
           onPress={handleBack}
           hitSlop={12}
@@ -119,29 +118,14 @@ export default function PinSetupScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
 
-        {/* Header */}
-        <View style={{ alignItems: "center", marginTop: 40, marginBottom: 40 }}>
-          <View style={{
-            width: 64,
-            height: 64,
-            borderRadius: 20,
-            backgroundColor: colors.primary.DEFAULT + "20",
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 24,
-          }}>
-            <Ionicons name="keypad" size={32} color={colors.primary.DEFAULT} />
+        <View style={padStyles.header}>
+          <View style={padStyles.headerIcon}>
+            <Ionicons name="keypad" size={30} color={colors.primary.DEFAULT} />
           </View>
-          
-          <Text style={{ 
-            color: colors.text, 
-            fontSize: 24, 
-            fontWeight: "700",
-            marginBottom: 8,
-          }}>
+          <Text style={padStyles.title}>
             {step === "create" ? "Create your PIN" : "Confirm your PIN"}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 16, textAlign: "center" }}>
+          <Text style={padStyles.subtitle}>
             {step === "create" 
               ? "Set a 4-digit PIN to secure your account"
               : "Enter your PIN again to confirm"
@@ -149,54 +133,30 @@ export default function PinSetupScreen() {
           </Text>
         </View>
 
-        {/* PIN Dots */}
-        <View style={{ flexDirection: "row", justifyContent: "center", gap: 16, marginBottom: 16 }}>
-          {Array.from({ length: PIN_LENGTH }).map((_, index) => (
-            <View
-              key={index}
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: 10,
-                backgroundColor: currentPin.length > index 
-                  ? colors.primary.DEFAULT 
-                  : colors.card,
-                borderWidth: 2,
-                borderColor: currentPin.length > index 
-                  ? colors.primary.DEFAULT 
-                  : colors.border,
-              }}
-            />
-          ))}
+        <View style={padStyles.dotsRow}>
+          {Array.from({ length: PIN_LENGTH }).map((_, index) => {
+            const filled = currentPin.length > index;
+            return (
+              <View key={index} style={[padStyles.dot, filled && padStyles.dotFilled]} />
+            );
+          })}
         </View>
 
-        {/* Error Message */}
-        {error && (
-          <Text style={{ 
-            color: colors.error.DEFAULT, 
-            fontSize: 14, 
-            textAlign: "center",
-            marginBottom: 16,
-          }}>
-            {error}
-          </Text>
-        )}
+        {error ? (
+          <Text style={padStyles.errorText}>{error}</Text>
+        ) : null}
 
-        {/* Number Pad */}
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <View style={{ gap: 16 }}>
+        <View style={padStyles.padContainer}>
+          <View style={padStyles.padGrid}>
             {[["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["", "0", "delete"]].map((row, rowIndex) => (
-              <View key={rowIndex} style={{ flexDirection: "row", justifyContent: "center", gap: 24 }}>
-                {row.map((item, index) => (
+              <View key={rowIndex} style={padStyles.padRow}>
+                {row.map((item, colIndex) => (
                   <NumberPadButton
-                    key={index}
+                    key={colIndex}
                     value={item}
                     onPress={() => {
-                      if (item === "delete") {
-                        handleDelete();
-                      } else if (item) {
-                        handleNumberPress(item);
-                      }
+                      if (item === "delete") handleDelete();
+                      else if (item) handleNumberPress(item);
                     }}
                   />
                 ))}
@@ -205,18 +165,9 @@ export default function PinSetupScreen() {
           </View>
         </View>
 
-        {/* Security Note - No skip option */}
-        <View style={{ 
-          alignItems: "center", 
-          paddingVertical: 16,
-          flexDirection: "row",
-          justifyContent: "center",
-          gap: 8,
-        }}>
+        <View style={padStyles.footer}>
           <Ionicons name="shield-checkmark" size={16} color={colors.textMuted} />
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-            PIN is required to secure your account
-          </Text>
+          <Text style={padStyles.footerText}>PIN is required to secure your account</Text>
         </View>
       </View>
     </SafeAreaView>
@@ -225,29 +176,154 @@ export default function PinSetupScreen() {
 
 function NumberPadButton({ value, onPress }: { value: string; onPress: () => void }) {
   if (!value) {
-    return <View style={{ width: 72, height: 72 }} />;
+    return <View style={padStyles.keyEmpty} />;
   }
 
+  const isDelete = value === "delete";
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: pressed ? colors.card : colors.cardElevated,
-        alignItems: "center",
-        justifyContent: "center",
-        transform: [{ scale: pressed ? 0.95 : 1 }],
-      })}
-    >
-      {value === "delete" ? (
-        <Ionicons name="backspace-outline" size={28} color={colors.text} />
-      ) : (
-        <Text style={{ color: colors.text, fontSize: 28, fontWeight: "600" }}>
-          {value}
-        </Text>
+    <Pressable onPress={onPress}>
+      {({ pressed }) => (
+        <View style={[
+          padStyles.key,
+          !isDelete && padStyles.keyNumber,
+          isDelete && padStyles.keyAction,
+          pressed && !isDelete && padStyles.keyPressed,
+          pressed && isDelete && padStyles.keyActionPressed,
+        ]}>
+          {isDelete ? (
+            <Ionicons name="backspace-outline" size={26} color={colors.textMuted} />
+          ) : (
+            <Text style={[padStyles.keyText, pressed && padStyles.keyTextPressed]}>
+              {value}
+            </Text>
+          )}
+        </View>
       )}
     </Pressable>
   );
 }
+
+const PAD_KEY_SIZE = 78;
+
+const padStyles = StyleSheet.create({
+  header: {
+    alignItems: "center",
+    marginTop: 32,
+    marginBottom: 36,
+  },
+  headerIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 107, 53, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  title: {
+    color: "#FAFAFA",
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  subtitle: {
+    color: "#A1A1AA",
+    fontSize: 15,
+    textAlign: "center",
+  },
+  dotsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 20,
+    marginBottom: 20,
+  },
+  dot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    borderColor: "#3F3F46",
+  },
+  dotFilled: {
+    backgroundColor: "#FF6B35",
+    borderColor: "#FF6B35",
+    shadowColor: "#FF6B35",
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  errorText: {
+    color: "#EF4444",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  padContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  padGrid: {
+    gap: 18,
+  },
+  padRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 26,
+  },
+  key: {
+    width: PAD_KEY_SIZE,
+    height: PAD_KEY_SIZE,
+    borderRadius: PAD_KEY_SIZE / 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  keyNumber: {
+    backgroundColor: "#1C1C1F",
+    borderWidth: 1,
+    borderColor: "#2A2A2E",
+  },
+  keyAction: {
+    backgroundColor: "transparent",
+  },
+  keyPressed: {
+    backgroundColor: "#FF6B35",
+    borderColor: "#FF6B35",
+    shadowColor: "#FF6B35",
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+    transform: [{ scale: 1.08 }],
+  },
+  keyActionPressed: {
+    opacity: 0.5,
+  },
+  keyEmpty: {
+    width: PAD_KEY_SIZE,
+    height: PAD_KEY_SIZE,
+  },
+  keyText: {
+    color: "#FAFAFA",
+    fontSize: 32,
+    fontWeight: "500",
+  },
+  keyTextPressed: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+  },
+  footerText: {
+    color: "#71717A",
+    fontSize: 13,
+  },
+});

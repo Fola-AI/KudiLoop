@@ -28,6 +28,8 @@ export default function GroupSettingsScreen() {
   // scheduleVisibility: 0 = hidden, 1 = visible (so we invert for the toggle)
   const [hideBeneficiary, setHideBeneficiary] = useState(false);
   const [hideSchedule, setHideSchedule] = useState(false);
+  const [payoutMedium, setPayoutMedium] = useState<'admin' | 'cycle_receiver'>('admin');
+  const [isUpdatingPayoutMethod, setIsUpdatingPayoutMethod] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const [isUpdatingAdmin, setIsUpdatingAdmin] = useState<string | null>(null);
   
@@ -37,8 +39,9 @@ export default function GroupSettingsScreen() {
       // recipientVisibility: 0 means hidden, 1 means visible
       setHideBeneficiary(group.recipientVisibility === 0);
       setHideSchedule(group.scheduleVisibility === 0);
+      setPayoutMedium(group.payoutMedium || 'admin');
     }
-  }, [group?.recipientVisibility, group?.scheduleVisibility]);
+  }, [group?.recipientVisibility, group?.scheduleVisibility, group?.payoutMedium]);
   
   // Determine user role
   const currentUserId = currentUser?.id;
@@ -93,6 +96,28 @@ export default function GroupSettingsScreen() {
       if (__DEV__) console.error('Toggle schedule error:', error);
     }
   }, [updateGroup, hasAdminPrivileges, hideSchedule]);
+
+  const handlePayoutMethodChange = useCallback(async (value: 'admin' | 'cycle_receiver') => {
+    if (!hasAdminPrivileges || isUpdatingPayoutMethod || value === payoutMedium) return;
+
+    const previousValue = payoutMedium;
+    setPayoutMedium(value);
+    setIsUpdatingPayoutMethod(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    try {
+      await updateGroup.mutateAsync({ payoutMedium: value });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      setPayoutMedium(previousValue);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update payout method';
+      safeAlert('Error', errorMessage);
+      if (__DEV__) console.error('Payout method update error:', error);
+    } finally {
+      setIsUpdatingPayoutMethod(false);
+    }
+  }, [hasAdminPrivileges, isUpdatingPayoutMethod, payoutMedium, updateGroup]);
   
   // Handle co-admin toggle
   const handleToggleCoAdmin = useCallback(async (memberId: string, memberName: string, isCurrentlyAdmin: boolean) => {
@@ -255,6 +280,85 @@ export default function GroupSettingsScreen() {
             <Text style={{ fontSize: 13, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>
               {group.name}
             </Text>
+          </View>
+
+          {/* Payout Method - Editable by creator/co-admin */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+            <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 12 }}>
+              Payout Method
+            </Text>
+
+            <Card>
+              <Pressable
+                onPress={() => handlePayoutMethodChange('admin')}
+                disabled={!hasAdminPrivileges || isUpdatingPayoutMethod}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 6,
+                  opacity: hasAdminPrivileges ? 1 : 0.5,
+                }}
+              >
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={{ color: colors.text, fontWeight: '500', fontSize: 15 }}>
+                    Via Admin
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
+                    Admin collects and distributes to recipient
+                  </Text>
+                </View>
+                {payoutMedium === 'admin' ? (
+                  <Ionicons name="checkmark-circle" size={22} color={colors.primary.DEFAULT} />
+                ) : (
+                  <Ionicons name="ellipse-outline" size={22} color={colors.textMuted} />
+                )}
+              </Pressable>
+
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 16 }} />
+
+              <Pressable
+                onPress={() => handlePayoutMethodChange('cycle_receiver')}
+                disabled={!hasAdminPrivileges || isUpdatingPayoutMethod}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 6,
+                  opacity: hasAdminPrivileges ? 1 : 0.5,
+                }}
+              >
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={{ color: colors.text, fontWeight: '500', fontSize: 15 }}>
+                    Direct to Recipient
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
+                    Members pay directly to the current cycle recipient
+                  </Text>
+                </View>
+                {payoutMedium === 'cycle_receiver' ? (
+                  <Ionicons name="checkmark-circle" size={22} color={colors.primary.DEFAULT} />
+                ) : (
+                  <Ionicons name="ellipse-outline" size={22} color={colors.textMuted} />
+                )}
+              </Pressable>
+
+              {!hasAdminPrivileges && (
+                <View style={{
+                  marginTop: 16,
+                  paddingTop: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}>
+                  <Ionicons name="lock-closed" size={14} color={colors.textMuted} />
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginLeft: 6 }}>
+                    Only group admins can change payout method
+                  </Text>
+                </View>
+              )}
+            </Card>
           </View>
           
           {/* Privacy Settings - Visible to all, editable by admins only */}

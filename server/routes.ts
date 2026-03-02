@@ -121,25 +121,6 @@ function normalizeBoolean(value: unknown): 0 | 1 | null {
   return null;
 }
 
-const MAGIC_LINK_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const MAGIC_LINK_RATE_LIMIT_MAX = 10;
-const magicLinkRequestLog = new Map<string, number[]>();
-
-function isMagicLinkRateLimited(email: string): boolean {
-  const now = Date.now();
-  const timestamps = magicLinkRequestLog.get(email) || [];
-  const recent = timestamps.filter((timestamp) => now - timestamp < MAGIC_LINK_RATE_LIMIT_WINDOW_MS);
-
-  if (recent.length >= MAGIC_LINK_RATE_LIMIT_MAX) {
-    magicLinkRequestLog.set(email, recent);
-    return true;
-  }
-
-  recent.push(now);
-  magicLinkRequestLog.set(email, recent);
-  return false;
-}
-
 // Clerk authentication middleware (replaces JWT auth)
 const authMiddleware = clerkAuthMiddleware;
 
@@ -156,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: [
           {
             appID: "7WQ97NM6W7.com.kudiloop.app",
-            paths: ["/join/*", "/invite/*", "/magic-link*"],
+            paths: ["/join/*", "/invite/*"],
           },
         ],
       },
@@ -254,102 +235,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.send(html);
   });
 
-  // POST /api/auth/magic-link
-  // Sends a magic sign-in link to the user's email
-  app.post("/api/auth/magic-link", async (req, res) => {
-    const successResponse = {
-      success: true,
-      message: "If an account exists with this email, you will receive a sign-in link shortly.",
-    };
-
-    try {
-      console.log("🔗 Magic link request received");
-      console.log("🔗 Request body:", req.body);
-
-      const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
-      console.log("🔗 Email:", email || "<missing>");
-      if (!email) {
-        return res.status(400).json({ message: "Email is required", error: "Email is required" });
-      }
-
-      const normalizedEmail = email.toLowerCase();
-      console.log("🔗 Normalized email:", normalizedEmail);
-
-      if (isMagicLinkRateLimited(normalizedEmail)) {
-        console.log("🔗 Rate limit exceeded for:", normalizedEmail);
-        return res.status(429).json({ message: "Too many requests. Please try again later.", error: "Too many requests. Please try again later." });
-      }
-
-      console.log("🔗 Clerk secret configured:", Boolean(process.env.CLERK_SECRET_KEY || process.env.CLERK_API_KEY));
-      console.log("🔗 SMTP configured:", Boolean(process.env.SMTP_USER && process.env.SMTP_PASS));
-
-      const user = await storage.getUserByEmail(normalizedEmail);
-      console.log("🔗 User lookup:", user ? "found" : "not found");
-      if (!user) {
-        return res.json(successResponse);
-      }
-
-      if (!user.clerkUserId) {
-        console.log("🔗 Missing clerk user ID for:", normalizedEmail);
-        return res.status(500).json({ message: "Failed to create magic link", error: "Failed to create magic link" });
-      }
-
-      console.log("🔗 Creating Clerk sign-in token for user:", user.clerkUserId);
-      const signInToken = await clerkClient.signInTokens.createSignInToken({
-        userId: user.clerkUserId,
-        expiresInSeconds: 600,
-      });
-      console.log("🔗 Clerk sign-in token created");
-
-      const tokenValue = encodeURIComponent(signInToken.token);
-      const magicLink = `kudiloop://magic-link?token=${tokenValue}`;
-      // Use the same deep link for fallback - no web fallback needed for mobile app
-      const webFallbackLink = magicLink;
-
-      const html = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #FF6B35;">Sign in to KudiLoop</h2>
-          <p>Use the button below to sign in. This link expires in 10 minutes.</p>
-          <p>
-            <a href="${magicLink}" style="display: inline-block; background-color: #FF6B35; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Sign in to KudiLoop</a>
-          </p>
-          <p style="color: #666; font-size: 14px;">If the button doesn't work, copy and paste this link into your mobile browser:</p>
-          <p style="word-break: break-all;"><a href="${webFallbackLink}">${webFallbackLink}</a></p>
-          <p style="color: #999; font-size: 12px;">If you didn't request this, you can ignore this email.</p>
-        </div>
-      `;
-
-      const text = [
-        "Sign in to KudiLoop",
-        "",
-        "Open this link to sign in (expires in 10 minutes):",
-        magicLink,
-        "",
-        "If you didn't request this, you can ignore this email.",
-      ].join("\n");
-
-      await sendEmail({
-        to: normalizedEmail,
-        subject: "Sign in to KudiLoop",
-        html,
-        text,
-      });
-      console.log("🔗 Magic link email sent to:", normalizedEmail);
-
-      return res.json(successResponse);
-    } catch (error: any) {
-      console.error("[Magic Link] Failed to send sign-in link");
-      console.error("[Magic Link] Error:", error?.message || error);
-      if (error?.stack) {
-        console.error("[Magic Link] Stack:", error.stack);
-      }
-      if (error?.errors) {
-        console.error("[Magic Link] Clerk errors:", error.errors);
-      }
-      return res.status(500).json({ message: "Failed to send magic link", error: "Failed to send magic link" });
-    }
-  });
-  
   // Helper function to check and update group go-live status
   async function checkAndUpdateGoLiveStatus(groupId: string) {
     // Don't filter by userId - we need to check any group's status
@@ -1182,17 +1067,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = getUserId(req);
       const validated = insertGroupSchema.parse(req.body);
       
-      // Validate go-live date (max 7 days in advance)
+      // Validate go-live date (must be in the future)
       if (validated.goLiveDate) {
         const goLiveDate = new Date(validated.goLiveDate);
         const now = new Date();
-        const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
         
         if (goLiveDate < now) {
           return res.status(400).json({ error: "Go-live date must be in the future" });
-        }
-        if (goLiveDate > maxDate) {
-          return res.status(400).json({ error: "Go-live date cannot be more than 7 days in advance" });
         }
       }
       
@@ -1240,9 +1121,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = getUserId(req);
       const updates = insertGroupSchema.partial().parse(req.body);
-      
-      // userId is already excluded from the schema, so it can't be in updates
-      const group = await storage.updateGroup(req.params.id, updates, userId);
+
+      const existingGroup = await storage.getGroup(req.params.id);
+      if (!existingGroup) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+
+      const isOwner = existingGroup.userId === userId;
+      const member = await storage.getMemberByUserAndGroup(userId, existingGroup.id);
+      const isCoAdmin = member?.isAdmin === 1;
+
+      if (!isOwner && !isCoAdmin) {
+        return res.status(403).json({ error: "Only group admins can update settings" });
+      }
+
+      // Co-admins can only edit operational settings, not ownership-level fields.
+      if (!isOwner) {
+        const allowedCoAdminFields = new Set(["payoutMedium", "recipientVisibility", "scheduleVisibility"]);
+        const updateKeys = Object.keys(updates);
+        const hasRestrictedField = updateKeys.some((key) => !allowedCoAdminFields.has(key));
+        if (hasRestrictedField) {
+          return res.status(403).json({ error: "Co-admins cannot update this group field" });
+        }
+      }
+
+      const group = await storage.updateGroup(req.params.id, updates, isOwner ? userId : undefined);
       if (!group) {
         return res.status(404).json({ error: "Group not found" });
       }
@@ -1264,7 +1167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update group collection date (owner only, pending groups only)
+  // Update group collection date (creator or co-admin)
   // NOTE: Collection date is the payment deadline - independent of go-live date
   app.patch("/api/groups/:id/collection-date", authMiddleware, async (req: any, res) => {
     try {
@@ -1280,8 +1183,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Group not found" });
       }
 
-      if (group.userId !== userId) {
-        return res.status(403).json({ error: "Only the group owner can adjust the collection date" });
+      const isOwner = group.userId === userId;
+      const member = await storage.getMemberByUserAndGroup(userId, group.id);
+      const isCoAdmin = member?.isAdmin === 1;
+
+      if (!isOwner && !isCoAdmin) {
+        return res.status(403).json({ error: "Only group admins can adjust the collection date" });
       }
 
       if (group.completedAt) {
@@ -1301,7 +1208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Do NOT modify startDate or goLiveDate - those are fixed at group creation
       const updatedGroup = await storage.updateGroup(req.params.id, { 
         nextCollectionDate: normalizedDate
-      }, userId);
+      }, isOwner ? userId : undefined);
       if (!updatedGroup) {
         return res.status(404).json({ error: "Group not found" });
       }
@@ -1770,9 +1677,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const member = await storage.createMember(validated);
+
+      const shouldExpandCycles = group.status === 'pending' && member.rotationOrder > group.totalCycles;
+      const effectiveTotalCycles = shouldExpandCycles ? member.rotationOrder : group.totalCycles;
+      if (shouldExpandCycles) {
+        await storage.updateGroup(group.id, { totalCycles: effectiveTotalCycles }, group.userId);
+      }
       
       // Create contributions for all cycles (current and future)
-      for (let cycle = group.currentCycle; cycle <= group.totalCycles; cycle++) {
+      for (let cycle = group.currentCycle; cycle <= effectiveTotalCycles; cycle++) {
         await storage.createContribution({
           groupId: validated.groupId,
           memberId: member.id,
@@ -2813,9 +2726,15 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
         canPostInGroup: 1,
         rotationOrder: maxRotationOrder + 1,
       });
+
+      const shouldExpandCycles = group.status === 'pending' && maxRotationOrder + 1 > group.totalCycles;
+      const effectiveTotalCycles = shouldExpandCycles ? maxRotationOrder + 1 : group.totalCycles;
+      if (shouldExpandCycles) {
+        await storage.updateGroup(group.id, { totalCycles: effectiveTotalCycles }, group.userId);
+      }
       
       // Create contributions for all cycles
-      for (let cycle = group.currentCycle; cycle <= group.totalCycles; cycle++) {
+      for (let cycle = group.currentCycle; cycle <= effectiveTotalCycles; cycle++) {
         await storage.createContribution({
           groupId: group.id,
           memberId: member.id,
@@ -3147,7 +3066,7 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
         const requestUser = await storage.getUser(joinRequest.userId);
         const maxRotationOrder = Math.max(...members.map(m => m.rotationOrder), 0);
         
-        await storage.createMember({
+        const createdMember = await storage.createMember({
           groupId: group.id,
           userId: joinRequest.userId,
           name: requestUser ? `${requestUser.firstName || ''} ${requestUser.lastName || ''}`.trim() || requestUser.email || 'New Member' : 'New Member',
@@ -3158,12 +3077,18 @@ app.patch("/api/contributions/:id/decline", authMiddleware, async (req: any, res
           canPostInGroup: 1,
           rotationOrder: maxRotationOrder + 1,
         });
+
+        const shouldExpandCycles = group.status === 'pending' && maxRotationOrder + 1 > group.totalCycles;
+        const effectiveTotalCycles = shouldExpandCycles ? maxRotationOrder + 1 : group.totalCycles;
+        if (shouldExpandCycles) {
+          await storage.updateGroup(group.id, { totalCycles: effectiveTotalCycles }, group.userId);
+        }
         
         // Create contributions for all remaining cycles
-        for (let cycle = group.currentCycle; cycle <= group.totalCycles; cycle++) {
+        for (let cycle = group.currentCycle; cycle <= effectiveTotalCycles; cycle++) {
           await storage.createContribution({
             groupId: group.id,
-            memberId: joinRequest.userId,
+            memberId: createdMember.id,
             cycle,
             amount: group.contributionAmount,
             status: 'pending',

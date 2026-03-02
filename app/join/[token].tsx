@@ -96,15 +96,24 @@ export default function JoinGroupScreen() {
       router.replace(`/group/${inviteData.group.id}`);
     } catch (err: any) {
       if (__DEV__) console.error('Failed to join group:', err);
-      const message = err?.response?.data?.message || err.message || 'Failed to join group';
+      const errorMessage = err?.response?.data?.error || err?.response?.data?.message || err.message;
+      const status = err?.response?.status;
       
-      if (message.toLowerCase().includes('already')) {
-        safeAlert("Already a Member", "You're already a member of this group.", [
-          { text: "Go to Group", onPress: () => router.replace(`/group/${inviteData.group.id}`) }
-        ]);
-      } else {
-        safeAlert("Error", message);
+      if (status === 409 || errorMessage?.toLowerCase().includes('already a member')) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        safeAlert(
+          "Already a Member",
+          "You're already a member of this group.",
+          [
+            { text: "Go to Group", onPress: () => router.replace(`/group/${inviteData.group.id}`) },
+            { text: "OK", style: "cancel" },
+          ]
+        );
+        return;
       }
+      
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      safeAlert("Error", errorMessage || "Failed to join group. Please try again.");
     } finally {
       setIsJoining(false);
     }
